@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Edit2, Shield, Bell, LogOut, Loader2, Upload } from 'lucide-react';
+import { Save, Shield, Bell, LogOut, Loader2, Upload } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
 import { signOut, updateProfile } from 'firebase/auth';
 import { auth, storage } from '@/lib/firebase';
@@ -60,7 +60,7 @@ export default function ProfilePage() {
       if (!user) return;
       
       const changesToSave = 
-        displayName !== user.displayName ||
+        displayName !== (user.displayName || '') ||
         imageFile;
 
       if (!changesToSave) {
@@ -84,8 +84,8 @@ export default function ProfilePage() {
           });
           
           toast({ title: 'Sucesso!', description: 'Perfil atualizado.', className: 'bg-green-500 text-white' });
-          // We can optionally reload the user to get fresh data everywhere
-          // or rely on the state updates. For now, this is fine.
+          // Force a reload of the user state if possible, or just let the user see the change visually.
+          // For a better UX, we might want to update the useAuth hook or a global state.
           
       } catch (error) {
           console.error("Error updating profile: ", error);
@@ -102,7 +102,7 @@ export default function ProfilePage() {
     });
   };
 
-  if (authLoading) {
+  if (authLoading || !user) {
       return (
            <div className="space-y-6">
               <div className="flex flex-col items-center space-y-4">
@@ -116,7 +116,7 @@ export default function ProfilePage() {
                  <CardHeader>
                    <CardTitle>Informações da Conta</CardTitle>
                  </CardHeader>
-                 <CardContent className="space-y-4">
+                 <CardContent className="space-y-4 pt-6">
                    <div className="space-y-2">
                      <Skeleton className="h-4 w-24" />
                      <Skeleton className="h-10 w-full" />
@@ -125,7 +125,7 @@ export default function ProfilePage() {
                       <Skeleton className="h-4 w-24" />
                      <Skeleton className="h-10 w-full" />
                    </div>
-                   <Skeleton className="h-11 w-full" />
+                   <Skeleton className="h-11 w-full rounded-md" />
                  </CardContent>
                </Card>
            </div>
@@ -144,10 +144,10 @@ export default function ProfilePage() {
       <div className="flex flex-col items-center space-y-4">
         <div className="relative">
           <Avatar className="h-24 w-24 border-4 border-background">
-            <AvatarImage src={imagePreview || undefined} alt={user?.displayName || 'User'} data-ai-hint="profile person" />
+            <AvatarImage src={imagePreview || undefined} alt={user?.displayName || 'User'} />
             <AvatarFallback>{displayName?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase()}</AvatarFallback>
           </Avatar>
-          <Button size="icon" className="absolute bottom-0 right-0 rounded-full" onClick={() => fileInputRef.current?.click()}>
+          <Button size="icon" className="absolute bottom-0 right-0 h-8 w-8 rounded-full" onClick={() => fileInputRef.current?.click()}>
             <Upload className="h-4 w-4" />
           </Button>
         </div>
@@ -171,7 +171,7 @@ export default function ProfilePage() {
             <Input id="email" type="email" value={user?.email || ''} disabled />
           </div>
           <Button className="w-full" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <Loader2 className="mr-2 animate-spin"/> : <Save className="mr-2 h-5 w-5"/>}
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>}
             Salvar Alterações
           </Button>
         </CardContent>
@@ -182,21 +182,21 @@ export default function ProfilePage() {
           <CardTitle>Configurações</CardTitle>
         </CardHeader>
         <CardContent className="space-y-1">
-           <Button variant="ghost" className="w-full justify-start" onClick={handleNotImplemented}>
-             <Shield className="mr-3" />
+           <Button variant="ghost" className="w-full justify-start p-4" onClick={handleNotImplemented}>
+             <Shield className="mr-3 h-5 w-5" />
              Segurança e Senha
            </Button>
            <Separator />
-           <Button variant="ghost" className="w-full justify-start" onClick={handleNotImplemented}>
-             <Bell className="mr-3" />
+           <Button variant="ghost" className="w-full justify-start p-4" onClick={handleNotImplemented}>
+             <Bell className="mr-3 h-5 w-5" />
              Notificações
            </Button>
         </CardContent>
       </Card>
        <Card>
          <CardContent className="p-3">
-             <Button variant="destructive" className="w-full justify-center" onClick={handleLogout}>
-                <LogOut className="mr-3"/>
+             <Button variant="destructive" className="w-full justify-center text-base py-6" onClick={handleLogout}>
+                <LogOut className="mr-3 h-5 w-5"/>
                 Sair da Conta
             </Button>
          </CardContent>
