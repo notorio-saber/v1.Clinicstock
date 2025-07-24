@@ -161,26 +161,31 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
 
   return (
     <Card>
-      <CardContent className="p-4 flex items-center gap-4">
-        <Image src={product.photoURL} alt={product.name} width={64} height={64} className="rounded-full object-cover" data-ai-hint={product['data-ai-hint']} />
-        <div className="flex-1 space-y-1">
-          <div className="flex justify-between">
-            <h3 className="font-semibold">{product.name}</h3>
-             <Badge variant="outline" className={status.className}>{status.text}</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground">{product.category}</p>
-          <div className="flex items-center gap-4 text-sm">
-            <span>Estoque: <span className="font-medium">{product.currentStock} / min: {product.minimumStock}</span></span>
-            <span className={expiryColor}>
-              Val: {new Date(product.expiryDate).toLocaleDateString('pt-BR')}
-            </span>
-          </div>
+      <CardContent className="p-3 flex items-start gap-4">
+         <Image src={product.photoURL} alt={product.name} width={64} height={64} className="rounded-md object-cover aspect-square" data-ai-hint={product['data-ai-hint']} />
+        
+        <div className="flex-1 space-y-2">
+            <div className='flex justify-between items-start'>
+                <div>
+                     <h3 className="font-semibold leading-tight">{product.name}</h3>
+                     <p className="text-sm text-muted-foreground">{product.category}</p>
+                </div>
+                <Badge variant="outline" className={cn("text-xs whitespace-nowrap", status.className)}>{status.text}</Badge>
+            </div>
+          
+            <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground pt-1">
+                <span>Estoque: <span className="font-medium text-foreground">{product.currentStock} / min: {product.minimumStock}</span></span>
+                <span className={expiryColor}>
+                Val: {new Date(product.expiryDate).toLocaleDateString('pt-BR')}
+                </span>
+            </div>
         </div>
+
         <AlertDialog>
             <Sheet open={!!sheetType} onOpenChange={(isOpen) => !isOpen && setSheetType(null)}>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" className='-mr-2 -mt-1 h-8 w-8'>
                             <MoreVertical className="h-5 w-5" />
                         </Button>
                     </DropdownMenuTrigger>
