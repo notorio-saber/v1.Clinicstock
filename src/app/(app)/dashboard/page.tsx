@@ -1,21 +1,28 @@
+'use client';
+
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Box, AlertTriangle, DollarSign, Plus, CalendarClock } from 'lucide-react';
+import { Box, AlertTriangle, DollarSign, Plus, CalendarClock, Package, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { mockProducts } from '@/lib/mock-data';
 import type { Product } from '@/lib/types';
 import { differenceInDays, parseISO } from 'date-fns';
 import Image from 'next/image';
+import useAuth from '@/hooks/useAuth';
+import { collection, onSnapshot, query } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type StatCardProps = {
   title: string;
   value: string;
   icon: React.ElementType;
   color: string;
+  loading?: boolean;
 };
 
-function StatCard({ title, value, icon: Icon, color }: StatCardProps) {
+function StatCard({ title, value, icon: Icon, color, loading }: StatCardProps) {
   return (
     <Card className="bg-card">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -23,7 +30,11 @@ function StatCard({ title, value, icon: Icon, color }: StatCardProps) {
         <Icon className={`h-5 w-5 ${color}`} />
       </CardHeader>
       <CardContent>
-        <div className="text-2xl lg:text-3xl font-bold truncate">{value}</div>
+        {loading ? (
+            <Skeleton className="h-8 w-1/2" />
+        ) : (
+            <div className="text-2xl lg:text-3xl font-bold truncate">{value}</div>
+        )}
       </CardContent>
     </Card>
   );
@@ -38,15 +49,40 @@ function getExpiryStatus(expiryDate: string): { days: number; color: string; lab
 }
 
 export default function DashboardPage() {
-  const totalProducts = mockProducts.length;
-  const expiringSoon = mockProducts.filter(p => {
+    const { user } = useAuth();
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user) return;
+        setLoading(true);
+        const productsCollectionRef = collection(db, `users/${user.uid}/products`);
+        const q = query(productsCollectionRef);
+
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const productsData: Product[] = [];
+            querySnapshot.forEach((doc) => {
+                productsData.push({ ...doc.data(), id: doc.id } as Product);
+            });
+            setProducts(productsData);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching products: ", error);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [user]);
+
+  const totalProducts = products.length;
+  const expiringSoon = products.filter(p => {
     const days = differenceInDays(parseISO(p.expiryDate), new Date());
     return days >= 0 && days <= 30;
   }).length;
-  const lowStock = mockProducts.filter(p => p.currentStock <= p.minimumStock).length;
-  const totalValue = mockProducts.reduce((sum, p) => sum + (p.costPrice || 0) * p.currentStock, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+  const lowStock = products.filter(p => p.currentStock <= p.minimumStock).length;
+  const totalValue = products.reduce((sum, p) => sum + (p.costPrice || 0) * p.currentStock, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-  const nextExpiries = [...mockProducts]
+  const nextExpiries = [...products]
     .sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime())
     .filter(p => differenceInDays(parseISO(p.expiryDate), new Date()) >= 0)
     .slice(0, 5);
@@ -54,10 +90,10 @@ export default function DashboardPage() {
   return (
     <div className="relative space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total de Produtos" value={String(totalProducts)} icon={Box} color="text-blue-500" />
-        <StatCard title="Vencendo em 30 dias" value={String(expiringSoon)} icon={AlertTriangle} color="text-orange-500" />
-        <StatCard title="Estoque Baixo" value={String(lowStock)} icon={AlertTriangle} color="text-red-500" />
-        <StatCard title="Valor do Estoque" value={totalValue} icon={DollarSign} color="text-green-500" />
+        <StatCard title="Total de Produtos" value={String(totalProducts)} icon={Box} color="text-blue-500" loading={loading} />
+        <StatCard title="Vencendo em 30 dias" value={String(expiringSoon)} icon={AlertTriangle} color="text-orange-500" loading={loading} />
+        <StatCard title="Estoque Baixo" value={String(lowStock)} icon={AlertTriangle} color="text-red-500" loading={loading} />
+        <StatCard title="Valor do Estoque" value={totalValue} icon={DollarSign} color="text-green-500" loading={loading} />
       </div>
 
       <Card>
@@ -68,24 +104,46 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-4">
-            {nextExpiries.map((product: Product) => {
-               const status = getExpiryStatus(product.expiryDate);
-              return(
-              <li key={product.id} className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <Image src={product.photoURL} alt={product.name} width={40} height={40} className="rounded-full" data-ai-hint={product['data-ai-hint']}/>
-                  <div>
-                    <p className="font-semibold">{product.name}</p>
-                    <p className="text-sm text-muted-foreground">{product.category}</p>
-                  </div>
-                </div>
-                <Badge variant="outline" className={`border-0 text-white ${status.color}`}>
-                  {status.label}
-                </Badge>
-              </li>
-            )})}
-          </ul>
+          {loading ? (
+             <ul className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                    <li key={i} className="flex items-center justify-between gap-4">
+                         <div className="flex items-center gap-3">
+                           <Skeleton className="h-10 w-10 rounded-full" />
+                            <div className="space-y-2">
+                                <Skeleton className="h-4 w-24" />
+                                <Skeleton className="h-3 w-16" />
+                            </div>
+                         </div>
+                        <Skeleton className="h-6 w-12 rounded-full" />
+                    </li>
+                ))}
+             </ul>
+          ) : nextExpiries.length > 0 ? (
+            <ul className="space-y-4">
+                {nextExpiries.map((product: Product) => {
+                   const status = getExpiryStatus(product.expiryDate);
+                  return(
+                  <li key={product.id} className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <Image src={product.photoURL} alt={product.name} width={40} height={40} className="rounded-full" data-ai-hint={product['data-ai-hint']}/>
+                      <div>
+                        <p className="font-semibold">{product.name}</p>
+                        <p className="text-sm text-muted-foreground">{product.category}</p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className={`border-0 text-white ${status.color}`}>
+                      {status.label}
+                    </Badge>
+                  </li>
+                )})}
+              </ul>
+          ) : (
+             <div className="text-center py-8 text-muted-foreground">
+                <Package className="mx-auto h-8 w-8" />
+                <p className="mt-2 text-sm">Nenhum produto com vencimento próximo.</p>
+             </div>
+          )}
         </CardContent>
       </Card>
       
