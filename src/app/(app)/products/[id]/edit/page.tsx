@@ -155,7 +155,7 @@ export default function EditProductPage() {
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 pb-24">
           <Card>
             <CardHeader>
               <CardTitle>Foto do Produto</CardTitle>
@@ -358,14 +358,16 @@ export default function EditProductPage() {
             </CardContent>
           </Card>
 
-          <div className="sticky bottom-24 -mx-4 -mb-24 bg-background/80 p-4 backdrop-blur-sm">
-            <Button type="submit" size="lg" className="w-full" disabled={isSaving}>
-              {isSaving ? (
-                <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Salvando Alterações...</>
-              ) : (
-                <><Save className="mr-2 h-5 w-5" /> Salvar Alterações</>
-              )}
-            </Button>
+          <div className="fixed bottom-20 left-0 right-0 z-20 md:max-w-3xl md:mx-auto md:left-auto">
+            <div className="bg-background/80 p-4 backdrop-blur-sm">
+                <Button type="submit" size="lg" className="w-full" disabled={isSaving}>
+                  {isSaving ? (
+                    <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Salvando Alterações...</>
+                  ) : (
+                    <><Save className="mr-2 h-5 w-5" /> Salvar Alterações</>
+                  )}
+                </Button>
+            </div>
           </div>
         </form>
       </Form>
