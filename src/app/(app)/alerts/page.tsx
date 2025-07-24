@@ -35,7 +35,7 @@ function AlertCard({ product }: { product: Product }) {
                         </p>
                     </div>
                 </div>
-                <div className="mt-2 flex justify-end gap-2">
+                <div className="mt-2 flex flex-wrap justify-end gap-2">
                     <Button variant="outline" size="sm"><Edit className="mr-1 h-3 w-3"/> Editar</Button>
                     <Button variant="outline" size="sm"><PackagePlus className="mr-1 h-3 w-3"/> Entrada</Button>
                     <Button variant="destructive" size="sm"><Trash2 className="mr-1 h-3 w-3"/> Descartar</Button>
