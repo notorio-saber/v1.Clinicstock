@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, deleteDoc, doc, collection, addDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, deleteDoc, doc, addDoc } from 'firebase/firestore';
 import { db, storage, runTransaction } from '@/lib/firebase';
 import useAuth from '@/hooks/useAuth';
 import Link from 'next/link';
@@ -143,107 +143,7 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
     )
 }
 
-
 function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: string) => Promise<void> }) {
-  const status = getStatus(product);
-  const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
-  
-  let expiryColor = 'text-green-500';
-  if (daysToExpiry < 7) expiryColor = 'text-red-500';
-  else if (daysToExpiry <= 30) expiryColor = 'text-orange-500';
-
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    await onDelete(product.id);
-    // No need to set isDeleting to false as the component will unmount
-  };
-
-  return (
-    <Card>
-      <CardContent className="p-4 flex items-center gap-4">
-        <Image src={product.photoURL} alt={product.name} width={64} height={64} className="rounded-full object-cover" data-ai-hint={product['data-ai-hint']} />
-        <div className="flex-1 space-y-1">
-          <div className="flex justify-between">
-            <h3 className="font-semibold">{product.name}</h3>
-             <Badge variant="outline" className={status.className}>{status.text}</Badge>
-          </div>
-          <p className="text-sm text-muted-foreground">{product.category}</p>
-          <div className="flex items-center gap-4 text-sm">
-            <span>Estoque: <span className="font-medium">{product.currentStock} / min: {product.minimumStock}</span></span>
-            <span className={expiryColor}>
-              Val: {new Date(product.expiryDate).toLocaleDateString('pt-BR')}
-            </span>
-          </div>
-        </div>
-        <AlertDialog>
-             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-5 w-5" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                            <Link href={`/products/${product.id}/edit`}><Edit className="mr-2 h-4 w-4"/>Editar</Link>
-                        </DropdownMenuItem>
-                        <SheetTrigger asChild>
-                            <DropdownMenuItem><ArrowUp className="mr-2 h-4 w-4 text-green-500"/>Registrar Entrada</DropdownMenuItem>
-                        </SheetTrigger>
-                         <SheetTrigger asChild>
-                            <DropdownMenuItem><ArrowDown className="mr-2 h-4 w-4 text-red-500"/>Registrar Saída</DropdownMenuItem>
-                        </SheetTrigger>
-                         <DropdownMenuSeparator />
-                        <AlertDialogTrigger asChild>
-                           <DropdownMenuItem className="text-red-500 focus:text-red-500 focus:bg-red-500/10">
-                             <Trash2 className="mr-2 h-4 w-4"/>Excluir
-                           </DropdownMenuItem>
-                        </AlertDialogTrigger>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-                <SheetContent>
-                    <SheetHeader>
-                        <SheetTitle>Registrar Entrada: {product.name}</SheetTitle>
-                         <SheetDescription>
-                            Adicione novas unidades ao estoque deste produto.
-                        </SheetDescription>
-                    </SheetHeader>
-                     <MovementForm product={product} type="entrada" onFinished={() => setIsSheetOpen(false)} />
-                </SheetContent>
-                 <SheetContent>
-                     <SheetHeader>
-                         <SheetTitle>Registrar Saída: {product.name}</SheetTitle>
-                         <SheetDescription>
-                            Remova unidades do estoque (por uso, venda, perda, etc).
-                        </SheetDescription>
-                     </SheetHeader>
-                     <MovementForm product={product} type="saida" onFinished={() => setIsSheetOpen(false)} />
-                 </SheetContent>
-            </Sheet>
-             <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto <span className="font-semibold">{product.name}</span> e todo o seu histórico de movimentações.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Sim, excluir
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-        </AlertDialog>
-      </CardContent>
-    </Card>
-  )
-}
-
-function ProductCardWithLogic({ product, onDelete }: { product: Product, onDelete: (id: string) => Promise<void> }) {
   const status = getStatus(product);
   const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
   const [isDeleting, setIsDeleting] = useState(false);
@@ -422,7 +322,7 @@ function ProductList() {
     return (
         <div className="space-y-3">
             {products.map((product) => (
-                <ProductCardWithLogic key={product.id} product={product} onDelete={handleDeleteProduct} />
+                <ProductCard key={product.id} product={product} onDelete={handleDeleteProduct} />
             ))}
         </div>
     );
