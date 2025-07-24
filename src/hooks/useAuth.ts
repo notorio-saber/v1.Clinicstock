@@ -11,14 +11,21 @@ export default function useAuth() {
   const router = useRouter();
   const pathname = usePathname();
 
+  const reloadUser = async () => {
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      setUser(auth.currentUser);
+    }
+  }
+
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
       setLoading(false);
       
       const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/signup');
       
-      if (!user && !isAuthPage) {
+      if (!currentUser && !isAuthPage) {
         router.replace('/login');
       }
     });
@@ -26,5 +33,5 @@ export default function useAuth() {
     return () => unsubscribe();
   }, [router, pathname]);
 
-  return { user, loading };
+  return { user, loading, reloadUser };
 }

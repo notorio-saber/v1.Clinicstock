@@ -17,7 +17,7 @@ import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export default function ProfilePage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, reloadUser } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -82,10 +82,11 @@ export default function ProfilePage() {
               displayName,
               photoURL,
           });
+
+          await reloadUser(); // Force a reload of user data
           
           toast({ title: 'Sucesso!', description: 'Perfil atualizado.', className: 'bg-green-500 text-white' });
-          // Force a reload of the user state if possible, or just let the user see the change visually.
-          // For a better UX, we might want to update the useAuth hook or a global state.
+          setImageFile(null); // Reset file input after saving
           
       } catch (error) {
           console.error("Error updating profile: ", error);

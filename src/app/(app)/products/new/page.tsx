@@ -17,9 +17,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import useAuth from '@/hooks/useAuth';
-import { db, storage } from '@/lib/firebase';
-import { doc, setDoc, collection } from 'firebase/firestore';
+import { db, storage, runTransaction } from '@/lib/firebase';
+import { doc, collection } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import type { Product, StockMovement } from '@/lib/types';
+
 
 const productSchema = z.object({
   name: z.string().min(3, { message: 'O nome do produto é obrigatório.' }),
@@ -86,24 +88,42 @@ export default function NewProductPage() {
 
     setIsSaving(true);
     try {
-      // 1. Gerar um ID para o novo produto
       const newProductRef = doc(collection(db, `users/${user.uid}/products`));
       const productId = newProductRef.id;
 
-      // 2. Fazer upload da imagem para o Storage
       const imageRef = ref(storage, `users/${user.uid}/products/${productId}/${imageFile.name}`);
       const uploadResult = await uploadBytes(imageRef, imageFile);
       const photoURL = await getDownloadURL(uploadResult.ref);
 
-      // 3. Salvar os dados do produto no Firestore
-      const productData = {
+      const productData: Product = {
         ...data,
         id: productId,
         photoURL,
         'data-ai-hint': 'product bottle', // Placeholder hint
       };
-      
-      await setDoc(newProductRef, productData);
+
+      await runTransaction(db, async (transaction) => {
+        // 1. Create the product document
+        transaction.set(newProductRef, productData);
+
+        // 2. Create the initial stock movement entry if stock is > 0
+        if (data.currentStock > 0) {
+            const movementCollectionRef = collection(db, `users/${user.uid}/movements`);
+            const movementData: Omit<StockMovement, 'id'> = {
+                productId: productId,
+                productName: data.name,
+                type: 'entrada',
+                quantity: data.currentStock,
+                reason: 'Entrada Manual', // or 'Cadastro Inicial'
+                date: new Date().toISOString(),
+                previousStock: 0,
+                newStock: data.currentStock,
+                notes: 'Estoque inicial ao cadastrar o produto.',
+            };
+            transaction.set(doc(movementCollectionRef), movementData);
+        }
+      });
+
 
       toast({
         title: 'Sucesso!',
@@ -216,7 +236,7 @@ export default function NewProductPage() {
                   name="currentStock"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Quantidade Atual*</FormLabel>
+                      <FormLabel>Quantidade Inicial*</FormLabel>
                       <FormControl><Input type="number" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
