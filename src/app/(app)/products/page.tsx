@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, deleteDoc, doc, addDoc } from 'firebase/firestore';
 import { db, storage, runTransaction } from '@/lib/firebase';
 import useAuth from '@/hooks/useAuth';
@@ -46,11 +46,12 @@ import {Label} from "@/components/ui/label";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 const getStatus = (product: Product): { text: string; className: string } => {
     const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
     if (daysToExpiry < 0) return { text: 'Vencido', className: 'bg-red-500/20 text-red-500 border-red-500/30' };
-    if (product.currentStock <= product.minimumStock) return { text: 'Estoque Baixo', className: 'bg-orange-500/20 text-orange-500 border-orange-500/30' };
+    if (product.currentStock > 0 && product.currentStock <= product.minimumStock) return { text: 'Estoque Baixo', className: 'bg-orange-500/20 text-orange-500 border-orange-500/30' };
     if (daysToExpiry <= 30) return { text: 'Vencendo', className: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' };
     return { text: 'Estoque OK', className: 'bg-green-500/20 text-green-500 border-green-500/30' };
 };
@@ -150,7 +151,7 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
   const [sheetType, setSheetType] = useState<'entrada' | 'saida' | null>(null);
   
   let expiryColor = 'text-green-500';
-  if (daysToExpiry < 7) expiryColor = 'text-red-500';
+  if (daysToExpiry < 0) expiryColor = 'text-red-500';
   else if (daysToExpiry <= 30) expiryColor = 'text-orange-500';
 
   const handleDelete = async () => {
@@ -238,11 +239,39 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
   )
 }
 
-function ProductList() {
+function ProductList({ products }: { products: Product[] }) {
+    if (products.length === 0) {
+        return (
+            <div className="text-center py-16">
+                <Package className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-semibold">Nenhum resultado encontrado</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Tente ajustar sua busca ou filtros.</p>
+            </div>
+        )
+    }
+
+    const handleDeleteProduct = async (id: string) => {
+        // Esta função será passada como prop, a lógica está no componente pai
+    };
+
+    return (
+        <div className="space-y-3">
+            {products.map((product) => (
+                <ProductCard key={product.id} product={product} onDelete={() => Promise.resolve()} />
+            ))}
+        </div>
+    );
+}
+
+export default function ProductsPage() {
     const { user } = useAuth();
     const { toast } = useToast();
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [activeFilter, setActiveFilter] = useState('Todos');
+
+    const filters = ['Todos', 'Vencendo', 'Estoque Baixo', 'Injetáveis', 'Descartáveis'];
 
     useEffect(() => {
         if (!user) return;
@@ -264,6 +293,31 @@ function ProductList() {
 
         return () => unsubscribe();
     }, [user]);
+    
+    const filteredProducts = useMemo(() => {
+        return products.filter(product => {
+            const searchMatch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+            
+            if (!searchMatch) return false;
+            
+            if (activeFilter === 'Todos') return true;
+            if (activeFilter === 'Vencendo') {
+                const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
+                return daysToExpiry >= 0 && daysToExpiry <= 30;
+            }
+            if (activeFilter === 'Estoque Baixo') {
+                return product.currentStock > 0 && product.currentStock <= product.minimumStock;
+            }
+            if (activeFilter === 'Injetáveis') {
+                return product.category === 'Injetáveis';
+            }
+            if (activeFilter === 'Descartáveis') {
+                return product.category === 'Materiais Descartáveis';
+            }
+            return true;
+        });
+    }, [products, searchTerm, activeFilter]);
+
 
     const handleDeleteProduct = async (id: string) => {
         if (!user) {
@@ -287,65 +341,84 @@ function ProductList() {
         }
     };
 
-    if (loading) {
-        return (
-            <div className="space-y-3">
-                {[...Array(3)].map((_, i) => (
-                    <Card key={i}>
-                        <CardContent className="p-4 flex items-center gap-4">
-                           <Skeleton className="h-16 w-16 rounded-full" />
-                            <div className="flex-1 space-y-2">
-                                <Skeleton className="h-4 w-3/4" />
-                                <Skeleton className="h-4 w-1/2" />
-                                <Skeleton className="h-4 w-2/3" />
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-        )
-    }
+    const renderContent = () => {
+      if (loading) {
+          return (
+              <div className="space-y-3">
+                  {[...Array(3)].map((_, i) => (
+                      <Card key={i}>
+                          <CardContent className="p-4 flex items-center gap-4">
+                             <Skeleton className="h-16 w-16 rounded-full" />
+                              <div className="flex-1 space-y-2">
+                                  <Skeleton className="h-4 w-3/4" />
+                                  <Skeleton className="h-4 w-1/2" />
+                                  <Skeleton className="h-4 w-2/3" />
+                              </div>
+                          </CardContent>
+                      </Card>
+                  ))}
+              </div>
+          )
+      }
+  
+      if (products.length === 0) {
+          return (
+              <div className="text-center py-16">
+                  <Package className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <h3 className="mt-4 text-lg font-semibold">Nenhum produto cadastrado</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">Comece a adicionar produtos para vê-los aqui.</p>
+                  <Button asChild className="mt-4">
+                      <Link href="/products/new">Adicionar Primeiro Produto</Link>
+                  </Button>
+              </div>
+          )
+      }
 
-    if (products.length === 0) {
+      if (filteredProducts.length === 0) {
         return (
             <div className="text-center py-16">
                 <Package className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">Nenhum produto cadastrado</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Comece a adicionar produtos para vê-los aqui.</p>
-                <Button asChild className="mt-4">
-                    <Link href="/products/new">Adicionar Primeiro Produto</Link>
-                </Button>
+                <h3 className="mt-4 text-lg font-semibold">Nenhum resultado encontrado</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Tente ajustar sua busca ou filtros.</p>
             </div>
         )
     }
+  
+      return (
+          <div className="space-y-3">
+              {filteredProducts.map((product) => (
+                  <ProductCard key={product.id} product={product} onDelete={handleDeleteProduct} />
+              ))}
+          </div>
+      );
+    }
 
-    return (
-        <div className="space-y-3">
-            {products.map((product) => (
-                <ProductCard key={product.id} product={product} onDelete={handleDeleteProduct} />
-            ))}
-        </div>
-    );
-}
-
-export default function ProductsPage() {
-  const filters = ['Todos', 'Vencendo', 'Estoque Baixo', 'Injetáveis', 'Descartáveis'];
   return (
     <div className="space-y-4">
       <div className="sticky top-16 bg-secondary/80 backdrop-blur-sm z-10 -mx-4 px-4 py-3 -mt-4 border-b">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-          <Input placeholder="Buscar produtos..." className="pl-10" />
+          <Input 
+            placeholder="Buscar produtos..." 
+            className="pl-10"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
         <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
           {filters.map((filter) => (
-            <Button key={filter} variant={filter === 'Todos' ? 'default' : 'outline'} className="whitespace-nowrap rounded-full">
+            <Button 
+                key={filter} 
+                variant={activeFilter === filter ? 'default' : 'outline'} 
+                className="whitespace-nowrap rounded-full"
+                onClick={() => setActiveFilter(filter)}
+            >
               {filter}
             </Button>
           ))}
         </div>
       </div>
-      <ProductList />
+      {renderContent()}
     </div>
   );
 }
