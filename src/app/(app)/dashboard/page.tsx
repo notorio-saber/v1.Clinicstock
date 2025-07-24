@@ -23,7 +23,7 @@ function StatCard({ title, value, icon: Icon, color }: StatCardProps) {
         <Icon className={`h-5 w-5 ${color}`} />
       </CardHeader>
       <CardContent>
-        <div className="text-3xl font-bold">{value}</div>
+        <div className="text-2xl lg:text-3xl font-bold truncate">{value}</div>
       </CardContent>
     </Card>
   );

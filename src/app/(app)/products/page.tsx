@@ -8,7 +8,20 @@ import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import { differenceInDays, parseISO } from 'date-fns';
 import { MoreVertical, Edit, ArrowUp, ArrowDown } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from '@/components/ui/sheet';
+import {Label} from "@/components/ui/label";
 
 const getStatus = (product: Product): { text: string; className: string } => {
     const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
@@ -17,6 +30,31 @@ const getStatus = (product: Product): { text: string; className: string } => {
     if (daysToExpiry <= 30) return { text: 'Vencendo', className: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' };
     return { text: 'Estoque OK', className: 'bg-green-500/20 text-green-500 border-green-500/30' };
 };
+
+function RegisterEntryForm({product}: {product: Product}) {
+    return (
+        <form className="space-y-4 p-4">
+            <div className="space-y-2">
+                <Label htmlFor="quantity">Quantidade a Adicionar</Label>
+                <Input id="quantity" type="number" placeholder="0" required/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="cost">Novo Preço de Custo (R$)</Label>
+                <Input id="cost" type="number" step="0.01" placeholder="0,00"/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="expiry-date">Nova Data de Validade</Label>
+                <Input id="expiry-date" type="date"/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="batch">Novo Número do Lote</Label>
+                <Input id="batch" placeholder="ABC1234"/>
+            </div>
+            <Button type="submit" className="w-full">Registrar Entrada</Button>
+        </form>
+    )
+}
+
 
 function ProductCard({ product }: { product: Product }) {
   const status = getStatus(product);
@@ -43,18 +81,28 @@ function ProductCard({ product }: { product: Product }) {
             </span>
           </div>
         </div>
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                    <MoreVertical className="h-5 w-5" />
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-                <DropdownMenuItem><Edit className="mr-2 h-4 w-4"/>Editar</DropdownMenuItem>
-                <DropdownMenuItem><ArrowUp className="mr-2 h-4 w-4 text-green-500"/>Registrar Entrada</DropdownMenuItem>
-                <DropdownMenuItem><ArrowDown className="mr-2 h-4 w-4 text-red-500"/>Registrar Saída</DropdownMenuItem>
-            </DropdownMenuContent>
-        </DropdownMenu>
+        <Sheet>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                        <MoreVertical className="h-5 w-5" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                    <DropdownMenuItem><Edit className="mr-2 h-4 w-4"/>Editar</DropdownMenuItem>
+                    <SheetTrigger asChild>
+                        <DropdownMenuItem><ArrowUp className="mr-2 h-4 w-4 text-green-500"/>Registrar Entrada</DropdownMenuItem>
+                    </SheetTrigger>
+                    <DropdownMenuItem><ArrowDown className="mr-2 h-4 w-4 text-red-500"/>Registrar Saída</DropdownMenuItem>
+                </DropdownMenuContent>
+            </DropdownMenu>
+            <SheetContent>
+                <SheetHeader>
+                    <SheetTitle>Registrar Entrada: {product.name}</SheetTitle>
+                </SheetHeader>
+                <RegisterEntryForm product={product} />
+            </SheetContent>
+        </Sheet>
       </CardContent>
     </Card>
   )
@@ -64,7 +112,7 @@ export default function ProductsPage() {
   const filters = ['Todos', 'Vencendo', 'Estoque Baixo', 'Injetáveis', 'Descartáveis'];
   return (
     <div className="space-y-4">
-      <div className="sticky top-16 bg-secondary/80 backdrop-blur-sm z-10 -mx-4 -mt-4 px-4 py-3">
+      <div className="sticky top-16 bg-secondary/80 backdrop-blur-sm z-10 -mx-4 px-4 py-3 -mt-4 border-b">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input placeholder="Buscar produtos..." className="pl-10" />

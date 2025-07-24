@@ -1,6 +1,7 @@
 import Logo from '@/components/logo';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import Link from 'next/link';
 
 export default function Header() {
   return (
@@ -8,10 +9,12 @@ export default function Header() {
       <Logo />
       <div className="flex items-center gap-4">
         <ThemeToggle />
-        <Avatar className="h-9 w-9">
-          <AvatarImage src="https://placehold.co/40x40.png" alt="Avatar" data-ai-hint="profile person" />
-          <AvatarFallback>CE</AvatarFallback>
-        </Avatar>
+        <Link href="/profile">
+            <Avatar className="h-9 w-9 cursor-pointer">
+              <AvatarImage src="https://placehold.co/40x40.png" alt="Avatar" data-ai-hint="profile person" />
+              <AvatarFallback>CE</AvatarFallback>
+            </Avatar>
+        </Link>
       </div>
     </header>
   );
