@@ -18,7 +18,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useToast } from '@/hooks/use-toast';
 import useAuth from '@/hooks/useAuth';
 import { db, storage, runTransaction } from '@/lib/firebase';
-import { doc, collection } from 'firebase/firestore';
+import { doc, collection, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product, StockMovement } from '@/lib/types';
 
@@ -101,28 +101,30 @@ export default function NewProductPage() {
         photoURL,
         'data-ai-hint': 'product bottle', // Placeholder hint
       };
+      
+      const batch = writeBatch(db);
 
-      await runTransaction(db, async (transaction) => {
-        // 1. Create the product document
-        transaction.set(newProductRef, productData);
+      // 1. Create the product document
+      batch.set(newProductRef, productData);
 
-        // 2. Create the initial stock movement entry if stock is > 0
-        if (data.currentStock > 0) {
-            const movementCollectionRef = collection(db, `users/${user.uid}/movements`);
-            const movementData: Omit<StockMovement, 'id'> = {
-                productId: productId,
-                productName: data.name,
-                type: 'entrada',
-                quantity: data.currentStock,
-                reason: 'Entrada Manual', // or 'Cadastro Inicial'
-                date: new Date().toISOString(),
-                previousStock: 0,
-                newStock: data.currentStock,
-                notes: 'Estoque inicial ao cadastrar o produto.',
-            };
-            transaction.set(doc(movementCollectionRef), movementData);
-        }
-      });
+      // 2. Create the initial stock movement entry if stock is > 0
+      if (data.currentStock > 0) {
+          const movementRef = doc(collection(db, `users/${user.uid}/movements`));
+          const movementData: Omit<StockMovement, 'id'> = {
+              productId: productId,
+              productName: data.name,
+              type: 'entrada',
+              quantity: data.currentStock,
+              reason: 'Entrada Manual',
+              date: new Date().toISOString(),
+              previousStock: 0,
+              newStock: data.currentStock,
+              notes: 'Estoque inicial ao cadastrar o produto.',
+          };
+          batch.set(movementRef, movementData);
+      }
+      
+      await batch.commit();
 
 
       toast({
