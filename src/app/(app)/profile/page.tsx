@@ -58,6 +58,16 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
       if (!user) return;
+      
+      const changesToSave = 
+        displayName !== user.displayName ||
+        imageFile;
+
+      if (!changesToSave) {
+          toast({ title: 'Nenhuma alteração', description: 'Não há novas informações para salvar.' });
+          return;
+      }
+
       setIsSaving(true);
       try {
           let photoURL = user.photoURL;
@@ -74,6 +84,9 @@ export default function ProfilePage() {
           });
           
           toast({ title: 'Sucesso!', description: 'Perfil atualizado.', className: 'bg-green-500 text-white' });
+          // We can optionally reload the user to get fresh data everywhere
+          // or rely on the state updates. For now, this is fine.
+          
       } catch (error) {
           console.error("Error updating profile: ", error);
           toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível atualizar o perfil.' });
@@ -150,15 +163,15 @@ export default function ProfilePage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="clinicName">Nome da Clínica ou Profissional</Label>
-            <Input id="clinicName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Seu nome ou da clínica" />
+            <Label htmlFor="displayName">Nome da Clínica ou Profissional</Label>
+            <Input id="displayName" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Seu nome ou da clínica" />
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input id="email" type="email" value={user?.email || ''} disabled />
           </div>
           <Button className="w-full" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? <Loader2 className="mr-2 animate-spin"/> : <Edit2 className="mr-2"/>}
+            {isSaving ? <Loader2 className="mr-2 animate-spin"/> : <Save className="mr-2 h-5 w-5"/>}
             Salvar Alterações
           </Button>
         </CardContent>
