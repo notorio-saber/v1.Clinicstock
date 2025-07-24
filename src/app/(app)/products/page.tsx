@@ -162,7 +162,9 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
   return (
     <Card>
       <CardContent className="p-3 flex items-start gap-4">
-        <Image src={product.photoURL} alt={product.name} width={64} height={64} className="rounded-md object-cover aspect-square flex-shrink-0" data-ai-hint={product['data-ai-hint']} />
+        <div className="relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden">
+            <Image src={product.photoURL} alt={product.name} layout="fill" className="object-cover" data-ai-hint={product['data-ai-hint']} />
+        </div>
         
         <div className="flex-1 space-y-1 min-w-0">
             <div className='flex justify-between items-start gap-2'>
@@ -377,9 +379,12 @@ export default function ProductsPage() {
     }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="sticky top-16 bg-secondary/80 backdrop-blur-sm z-10 -mx-4 px-4 py-3 border-b">
-        <h3 className="font-semibold mb-2">🚀 Filtros</h3>
+    <div className="space-y-4">
+       <div>
+        <h2 className="text-2xl font-bold tracking-tight">Meus Produtos</h2>
+        <p className="text-muted-foreground">Gerencie todos os seus itens em um só lugar.</p>
+      </div>
+      <div className="sticky top-16 bg-secondary/95 backdrop-blur-sm z-10 -mx-4 px-4 py-3 border-b -mt-4">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
@@ -402,9 +407,9 @@ export default function ProductsPage() {
           ))}
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto px-4">
-        {renderContent()}
-      </div>
+      
+      {renderContent()}
+      
     </div>
   );
 }
