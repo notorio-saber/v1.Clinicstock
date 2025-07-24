@@ -162,7 +162,9 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
   return (
     <Card>
       <CardContent className="p-3 flex items-start gap-4">
-         <Image src={product.photoURL} alt={product.name} width={64} height={64} className="rounded-md object-cover aspect-square" data-ai-hint={product['data-ai-hint']} />
+        <div className="w-16 h-16 relative flex-shrink-0">
+         <Image src={product.photoURL} alt={product.name} fill sizes="64px" className="rounded-md object-cover" data-ai-hint={product['data-ai-hint']} />
+        </div>
         
         <div className="flex-1 space-y-1">
             <div className='flex justify-between items-start gap-2'>

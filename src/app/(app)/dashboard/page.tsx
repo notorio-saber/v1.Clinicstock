@@ -13,6 +13,7 @@ import useAuth from '@/hooks/useAuth';
 import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 type StatCardProps = {
   title: string;
@@ -75,7 +76,7 @@ export default function DashboardPage() {
     }, [user]);
 
   const totalProducts = products.length;
-  const expiringSoon = products.filter(p => {
+  const expiringSoonCount = products.filter(p => {
     const days = differenceInDays(parseISO(p.expiryDate), new Date());
     return days >= 0 && days <= 30;
   }).length;
@@ -87,16 +88,18 @@ export default function DashboardPage() {
     .filter(p => differenceInDays(parseISO(p.expiryDate), new Date()) >= 0)
     .slice(0, 5);
 
+  const hasUrgentExpiries = nextExpiries.some(p => differenceInDays(parseISO(p.expiryDate), new Date()) <= 30);
+
   return (
     <div className="relative space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Total de Produtos" value={String(totalProducts)} icon={Box} color="text-blue-500" loading={loading} />
-        <StatCard title="Vencendo em 30 dias" value={String(expiringSoon)} icon={AlertTriangle} color="text-orange-500" loading={loading} />
+        <StatCard title="Vencendo em 30 dias" value={String(expiringSoonCount)} icon={AlertTriangle} color="text-orange-500" loading={loading} />
         <StatCard title="Estoque Baixo" value={String(lowStock)} icon={AlertTriangle} color="text-red-500" loading={loading} />
         <StatCard title="Valor do Estoque" value={totalValue} icon={DollarSign} color="text-green-500" loading={loading} />
       </div>
 
-      <Card>
+      <Card className={cn(hasUrgentExpiries && "border-red-500/50")}>
         <CardHeader>
           <div className="flex items-center gap-2">
             <CalendarClock className="h-5 w-5 text-muted-foreground" />
@@ -126,7 +129,7 @@ export default function DashboardPage() {
                   return(
                   <li key={product.id} className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <Image src={product.photoURL} alt={product.name} width={40} height={40} className="rounded-full" data-ai-hint={product['data-ai-hint']}/>
+                      <Image src={product.photoURL} alt={product.name} width={40} height={40} className="rounded-full object-cover" data-ai-hint={product['data-ai-hint']}/>
                       <div>
                         <p className="font-semibold">{product.name}</p>
                         <p className="text-sm text-muted-foreground">{product.category}</p>
