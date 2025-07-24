@@ -20,7 +20,7 @@ export type StockMovement = {
   productId: string;
   type: 'entrada' | 'saida';
   quantity: number;
-  reason?: 'Uso' | 'Venda' | 'Perda' | 'Vencimento' | 'Compra' | 'Ajuste';
+  reason?: 'Uso' | 'Venda' | 'Perda' | 'Vencimento' | 'Compra' | 'Ajuste' | 'Entrada Manual' | 'Saída Manual';
   date: string;
   previousStock: number;
   newStock: number;

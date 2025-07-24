@@ -1,15 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, onSnapshot, query, deleteDoc, doc, collection, addDoc } from 'firebase/firestore';
+import { db, storage, runTransaction } from '@/lib/firebase';
 import useAuth from '@/hooks/useAuth';
 import Link from 'next/link';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, MoreVertical, Edit, ArrowUp, ArrowDown, Package, Trash2, Loader2 } from 'lucide-react';
-import type { Product } from '@/lib/types';
+import { Search, MoreVertical, Edit, ArrowUp, ArrowDown, Package, Trash2, Loader2, Save } from 'lucide-react';
+import type { Product, StockMovement } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
@@ -24,9 +24,11 @@ import {
 import {
     Sheet,
     SheetContent,
+    SheetDescription,
     SheetHeader,
     SheetTitle,
     SheetTrigger,
+    SheetClose,
 } from '@/components/ui/sheet';
 import {
   AlertDialog,
@@ -43,6 +45,7 @@ import {
 import {Label} from "@/components/ui/label";
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea';
 
 const getStatus = (product: Product): { text: string; className: string } => {
     const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
@@ -52,26 +55,90 @@ const getStatus = (product: Product): { text: string; className: string } => {
     return { text: 'Estoque OK', className: 'bg-green-500/20 text-green-500 border-green-500/30' };
 };
 
-function RegisterEntryForm({product}: {product: Product}) {
+function MovementForm({ product, type, onFinished }: { product: Product, type: 'entrada' | 'saida', onFinished: () => void }) {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!user) return;
+
+        const formData = new FormData(event.currentTarget);
+        const quantity = parseInt(formData.get('quantity') as string, 10);
+        const notes = formData.get('notes') as string;
+
+        if (isNaN(quantity) || quantity <= 0) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'A quantidade deve ser um número positivo.' });
+            return;
+        }
+
+        if (type === 'saida' && quantity > product.currentStock) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'A quantidade de saída não pode ser maior que o estoque atual.' });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+             await runTransaction(db, async (transaction) => {
+                const productDocRef = doc(db, `users/${user.uid}/products`, product.id);
+                const productDoc = await transaction.get(productDocRef);
+                if (!productDoc.exists()) {
+                    throw new Error("Produto não encontrado!");
+                }
+
+                const currentData = productDoc.data() as Product;
+                const previousStock = currentData.currentStock;
+                const newStock = type === 'entrada' ? previousStock + quantity : previousStock - quantity;
+
+                // 1. Atualizar estoque do produto
+                transaction.update(productDocRef, { currentStock: newStock });
+
+                // 2. Criar registro de movimentação
+                const movementCollectionRef = collection(db, `users/${user.uid}/movements`);
+                const movementData: Omit<StockMovement, 'id'> = {
+                    productId: product.id,
+                    productName: product.name,
+                    type,
+                    quantity,
+                    reason: type === 'entrada' ? 'Entrada Manual' : 'Saída Manual',
+                    date: new Date().toISOString(),
+                    previousStock,
+                    newStock,
+                    notes,
+                };
+                transaction.set(doc(movementCollectionRef), movementData);
+            });
+
+            toast({
+                title: 'Sucesso!',
+                description: `Movimentação de ${type} registrada.`,
+                className: 'bg-green-500 text-white',
+            });
+            onFinished();
+
+        } catch (error) {
+            console.error("Erro ao registrar movimentação: ", error);
+            toast({ variant: 'destructive', title: 'Erro na Transação', description: "Não foi possível registrar a movimentação." });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     return (
-        <form className="space-y-4 p-4">
+        <form onSubmit={handleSubmit} className="space-y-4 p-4">
             <div className="space-y-2">
-                <Label htmlFor="quantity">Quantidade a Adicionar</Label>
-                <Input id="quantity" type="number" placeholder="0" required/>
+                <Label htmlFor="quantity">Quantidade</Label>
+                <Input id="quantity" name="quantity" type="number" placeholder="0" required min="1"/>
             </div>
             <div className="space-y-2">
-                <Label htmlFor="cost">Novo Preço de Custo (R$)</Label>
-                <Input id="cost" type="number" step="0.01" placeholder="0,00"/>
+                <Label htmlFor="notes">Observações (Opcional)</Label>
+                <Textarea id="notes" name="notes" placeholder="Ex: Ajuste de inventário" />
             </div>
-            <div className="space-y-2">
-                <Label htmlFor="expiry-date">Nova Data de Validade</Label>
-                <Input id="expiry-date" type="date"/>
-            </div>
-            <div className="space-y-2">
-                <Label htmlFor="batch">Novo Número do Lote</Label>
-                <Input id="batch" placeholder="ABC1234"/>
-            </div>
-            <Button type="submit" className="w-full">Registrar Entrada</Button>
+            <Button type="submit" className="w-full" disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Salvar
+            </Button>
         </form>
     )
 }
@@ -81,6 +148,7 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
   const status = getStatus(product);
   const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   
   let expiryColor = 'text-green-500';
   if (daysToExpiry < 7) expiryColor = 'text-red-500';
@@ -110,7 +178,7 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
           </div>
         </div>
         <AlertDialog>
-            <Sheet>
+             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon">
@@ -124,7 +192,9 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
                         <SheetTrigger asChild>
                             <DropdownMenuItem><ArrowUp className="mr-2 h-4 w-4 text-green-500"/>Registrar Entrada</DropdownMenuItem>
                         </SheetTrigger>
-                        <DropdownMenuItem><ArrowDown className="mr-2 h-4 w-4 text-red-500"/>Registrar Saída</DropdownMenuItem>
+                         <SheetTrigger asChild>
+                            <DropdownMenuItem><ArrowDown className="mr-2 h-4 w-4 text-red-500"/>Registrar Saída</DropdownMenuItem>
+                        </SheetTrigger>
                          <DropdownMenuSeparator />
                         <AlertDialogTrigger asChild>
                            <DropdownMenuItem className="text-red-500 focus:text-red-500 focus:bg-red-500/10">
@@ -136,10 +206,117 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
                 <SheetContent>
                     <SheetHeader>
                         <SheetTitle>Registrar Entrada: {product.name}</SheetTitle>
+                         <SheetDescription>
+                            Adicione novas unidades ao estoque deste produto.
+                        </SheetDescription>
                     </SheetHeader>
-                    <RegisterEntryForm product={product} />
+                     <MovementForm product={product} type="entrada" onFinished={() => setIsSheetOpen(false)} />
+                </SheetContent>
+                 <SheetContent>
+                     <SheetHeader>
+                         <SheetTitle>Registrar Saída: {product.name}</SheetTitle>
+                         <SheetDescription>
+                            Remova unidades do estoque (por uso, venda, perda, etc).
+                        </SheetDescription>
+                     </SheetHeader>
+                     <MovementForm product={product} type="saida" onFinished={() => setIsSheetOpen(false)} />
+                 </SheetContent>
+            </Sheet>
+             <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto <span className="font-semibold">{product.name}</span> e todo o seu histórico de movimentações.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Sim, excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ProductCardWithLogic({ product, onDelete }: { product: Product, onDelete: (id: string) => Promise<void> }) {
+  const status = getStatus(product);
+  const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [sheetType, setSheetType] = useState<'entrada' | 'saida' | null>(null);
+  
+  let expiryColor = 'text-green-500';
+  if (daysToExpiry < 7) expiryColor = 'text-red-500';
+  else if (daysToExpiry <= 30) expiryColor = 'text-orange-500';
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    await onDelete(product.id);
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-4 flex items-center gap-4">
+        <Image src={product.photoURL} alt={product.name} width={64} height={64} className="rounded-full object-cover" data-ai-hint={product['data-ai-hint']} />
+        <div className="flex-1 space-y-1">
+          <div className="flex justify-between">
+            <h3 className="font-semibold">{product.name}</h3>
+             <Badge variant="outline" className={status.className}>{status.text}</Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">{product.category}</p>
+          <div className="flex items-center gap-4 text-sm">
+            <span>Estoque: <span className="font-medium">{product.currentStock} / min: {product.minimumStock}</span></span>
+            <span className={expiryColor}>
+              Val: {new Date(product.expiryDate).toLocaleDateString('pt-BR')}
+            </span>
+          </div>
+        </div>
+        <AlertDialog>
+            <Sheet open={!!sheetType} onOpenChange={(isOpen) => !isOpen && setSheetType(null)}>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-5 w-5" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                            <Link href={`/products/${product.id}/edit`}><Edit className="mr-2 h-4 w-4"/>Editar</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setSheetType('entrada')}>
+                            <ArrowUp className="mr-2 h-4 w-4 text-green-500"/>Registrar Entrada
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setSheetType('saida')}>
+                            <ArrowDown className="mr-2 h-4 w-4 text-red-500"/>Registrar Saída
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <AlertDialogTrigger asChild>
+                           <DropdownMenuItem className="text-red-500 focus:text-red-500 focus:bg-red-500/10">
+                             <Trash2 className="mr-2 h-4 w-4"/>Excluir
+                           </DropdownMenuItem>
+                        </AlertDialogTrigger>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle>
+                          {sheetType === 'entrada' ? `Registrar Entrada: ${product.name}` : `Registrar Saída: ${product.name}`}
+                        </SheetTitle>
+                         <SheetDescription>
+                            {sheetType === 'entrada' 
+                                ? 'Adicione novas unidades ao estoque deste produto.' 
+                                : 'Remova unidades do estoque (por uso, venda, perda, etc).'}
+                        </SheetDescription>
+                    </SheetHeader>
+                     {sheetType && <MovementForm product={product} type={sheetType} onFinished={() => setSheetType(null)} />}
                 </SheetContent>
             </Sheet>
+
              <AlertDialogContent>
                 <AlertDialogHeader>
                   <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
@@ -194,9 +371,11 @@ function ProductList() {
             return;
         }
         try {
+            // TODO: Also delete associated movements and storage image
+            // For now, let's just delete the product to test
             const productDocRef = doc(db, `users/${user.uid}/products`, id);
             await deleteDoc(productDocRef);
-            // TODO: Also delete associated movements and storage image
+            
             toast({
                 title: "Sucesso!",
                 description: "Produto excluído permanentemente.",
@@ -233,6 +412,9 @@ function ProductList() {
                 <Package className="mx-auto h-12 w-12 text-muted-foreground" />
                 <h3 className="mt-4 text-lg font-semibold">Nenhum produto cadastrado</h3>
                 <p className="mt-1 text-sm text-muted-foreground">Comece a adicionar produtos para vê-los aqui.</p>
+                <Button asChild className="mt-4">
+                    <Link href="/products/new">Adicionar Primeiro Produto</Link>
+                </Button>
             </div>
         )
     }
@@ -240,7 +422,7 @@ function ProductList() {
     return (
         <div className="space-y-3">
             {products.map((product) => (
-                <ProductCard key={product.id} product={product} onDelete={handleDeleteProduct} />
+                <ProductCardWithLogic key={product.id} product={product} onDelete={handleDeleteProduct} />
             ))}
         </div>
     );
