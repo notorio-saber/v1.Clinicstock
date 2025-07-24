@@ -1,13 +1,18 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import useAuth from '@/hooks/useAuth';
+
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search } from 'lucide-react';
-import { mockProducts } from '@/lib/mock-data';
+import { Search, MoreVertical, Edit, ArrowUp, ArrowDown, Package } from 'lucide-react';
 import type { Product } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Image from 'next/image';
 import { differenceInDays, parseISO } from 'date-fns';
-import { MoreVertical, Edit, ArrowUp, ArrowDown } from 'lucide-react';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -22,6 +27,7 @@ import {
     SheetTrigger,
 } from '@/components/ui/sheet';
 import {Label} from "@/components/ui/label";
+import { Skeleton } from '@/components/ui/skeleton';
 
 const getStatus = (product: Product): { text: string; className: string } => {
     const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
@@ -67,7 +73,7 @@ function ProductCard({ product }: { product: Product }) {
   return (
     <Card>
       <CardContent className="p-4 flex items-center gap-4">
-        <Image src={product.photoURL} alt={product.name} width={64} height={64} className="rounded-full" data-ai-hint={product['data-ai-hint']} />
+        <Image src={product.photoURL} alt={product.name} width={64} height={64} className="rounded-full object-cover" data-ai-hint={product['data-ai-hint']} />
         <div className="flex-1 space-y-1">
           <div className="flex justify-between">
             <h3 className="font-semibold">{product.name}</h3>
@@ -108,6 +114,70 @@ function ProductCard({ product }: { product: Product }) {
   )
 }
 
+function ProductList() {
+    const { user } = useAuth();
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!user) return;
+        setLoading(true);
+        const productsCollectionRef = collection(db, `users/${user.uid}/products`);
+        const q = query(productsCollectionRef);
+
+        const unsubscribe = onSnapshot(q, (querySnapshot) => {
+            const productsData: Product[] = [];
+            querySnapshot.forEach((doc) => {
+                productsData.push({ ...doc.data(), id: doc.id } as Product);
+            });
+            setProducts(productsData);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching products: ", error);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, [user]);
+
+    if (loading) {
+        return (
+            <div className="space-y-3">
+                {[...Array(3)].map((_, i) => (
+                    <Card key={i}>
+                        <CardContent className="p-4 flex items-center gap-4">
+                           <Skeleton className="h-16 w-16 rounded-full" />
+                            <div className="flex-1 space-y-2">
+                                <Skeleton className="h-4 w-3/4" />
+                                <Skeleton className="h-4 w-1/2" />
+                                <Skeleton className="h-4 w-2/3" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                ))}
+            </div>
+        )
+    }
+
+    if (products.length === 0) {
+        return (
+            <div className="text-center py-16">
+                <Package className="mx-auto h-12 w-12 text-muted-foreground" />
+                <h3 className="mt-4 text-lg font-semibold">Nenhum produto cadastrado</h3>
+                <p className="mt-1 text-sm text-muted-foreground">Comece a adicionar produtos para vê-los aqui.</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-3">
+            {products.map((product) => (
+                <ProductCard key={product.id} product={product} />
+            ))}
+        </div>
+    );
+}
+
 export default function ProductsPage() {
   const filters = ['Todos', 'Vencendo', 'Estoque Baixo', 'Injetáveis', 'Descartáveis'];
   return (
@@ -125,11 +195,7 @@ export default function ProductsPage() {
           ))}
         </div>
       </div>
-      <div className="space-y-3">
-        {mockProducts.map((product) => (
-          <ProductCard key={product.id} product={product} />
-        ))}
-      </div>
+      <ProductList />
     </div>
   );
 }

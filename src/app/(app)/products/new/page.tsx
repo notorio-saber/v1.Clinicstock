@@ -147,7 +147,6 @@ export default function NewProductPage() {
                   <Upload className="mr-2 h-4 w-4" /> Escolher da Galeria
                 </Button>
               </div>
-               {form.formState.errors.root && <FormMessage>{form.formState.errors.root.message}</FormMessage>}
             </CardContent>
           </Card>
 
