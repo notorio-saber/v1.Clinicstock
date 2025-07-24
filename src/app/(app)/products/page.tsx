@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, query, deleteDoc, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import useAuth from '@/hooks/useAuth';
+import Link from 'next/link';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, MoreVertical, Edit, ArrowUp, ArrowDown, Package } from 'lucide-react';
+import { Search, MoreVertical, Edit, ArrowUp, ArrowDown, Package, Trash2, Loader2 } from 'lucide-react';
 import type { Product } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -26,8 +28,21 @@ import {
     SheetTitle,
     SheetTrigger,
 } from '@/components/ui/sheet';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
 import {Label} from "@/components/ui/label";
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 
 const getStatus = (product: Product): { text: string; className: string } => {
     const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
@@ -62,13 +77,20 @@ function RegisterEntryForm({product}: {product: Product}) {
 }
 
 
-function ProductCard({ product }: { product: Product }) {
+function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: string) => Promise<void> }) {
   const status = getStatus(product);
   const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
+  const [isDeleting, setIsDeleting] = useState(false);
   
   let expiryColor = 'text-green-500';
   if (daysToExpiry < 7) expiryColor = 'text-red-500';
   else if (daysToExpiry <= 30) expiryColor = 'text-orange-500';
+
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    await onDelete(product.id);
+    // No need to set isDeleting to false as the component will unmount
+  };
 
   return (
     <Card>
@@ -87,28 +109,53 @@ function ProductCard({ product }: { product: Product }) {
             </span>
           </div>
         </div>
-        <Sheet>
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-5 w-5" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                    <DropdownMenuItem><Edit className="mr-2 h-4 w-4"/>Editar</DropdownMenuItem>
-                    <SheetTrigger asChild>
-                        <DropdownMenuItem><ArrowUp className="mr-2 h-4 w-4 text-green-500"/>Registrar Entrada</DropdownMenuItem>
-                    </SheetTrigger>
-                    <DropdownMenuItem><ArrowDown className="mr-2 h-4 w-4 text-red-500"/>Registrar Saída</DropdownMenuItem>
-                </DropdownMenuContent>
-            </DropdownMenu>
-            <SheetContent>
-                <SheetHeader>
-                    <SheetTitle>Registrar Entrada: {product.name}</SheetTitle>
-                </SheetHeader>
-                <RegisterEntryForm product={product} />
-            </SheetContent>
-        </Sheet>
+        <AlertDialog>
+            <Sheet>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-5 w-5" />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                            <Link href={`/products/${product.id}/edit`}><Edit className="mr-2 h-4 w-4"/>Editar</Link>
+                        </DropdownMenuItem>
+                        <SheetTrigger asChild>
+                            <DropdownMenuItem><ArrowUp className="mr-2 h-4 w-4 text-green-500"/>Registrar Entrada</DropdownMenuItem>
+                        </SheetTrigger>
+                        <DropdownMenuItem><ArrowDown className="mr-2 h-4 w-4 text-red-500"/>Registrar Saída</DropdownMenuItem>
+                         <DropdownMenuSeparator />
+                        <AlertDialogTrigger asChild>
+                           <DropdownMenuItem className="text-red-500 focus:text-red-500 focus:bg-red-500/10">
+                             <Trash2 className="mr-2 h-4 w-4"/>Excluir
+                           </DropdownMenuItem>
+                        </AlertDialogTrigger>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+                <SheetContent>
+                    <SheetHeader>
+                        <SheetTitle>Registrar Entrada: {product.name}</SheetTitle>
+                    </SheetHeader>
+                    <RegisterEntryForm product={product} />
+                </SheetContent>
+            </Sheet>
+             <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto <span className="font-semibold">{product.name}</span> e todo o seu histórico de movimentações.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Sim, excluir
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   )
@@ -116,6 +163,7 @@ function ProductCard({ product }: { product: Product }) {
 
 function ProductList() {
     const { user } = useAuth();
+    const { toast } = useToast();
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -128,9 +176,9 @@ function ProductList() {
         const unsubscribe = onSnapshot(q, (querySnapshot) => {
             const productsData: Product[] = [];
             querySnapshot.forEach((doc) => {
-                productsData.push({ ...doc.data(), id: doc.id } as Product);
+                productsData.push({ ...doc.data() as Omit<Product, 'id'>, id: doc.id });
             });
-            setProducts(productsData);
+            setProducts(productsData.sort((a,b) => a.name.localeCompare(b.name)));
             setLoading(false);
         }, (error) => {
             console.error("Error fetching products: ", error);
@@ -139,6 +187,26 @@ function ProductList() {
 
         return () => unsubscribe();
     }, [user]);
+
+    const handleDeleteProduct = async (id: string) => {
+        if (!user) {
+            toast({ variant: "destructive", title: "Erro", description: "Usuário não autenticado." });
+            return;
+        }
+        try {
+            const productDocRef = doc(db, `users/${user.uid}/products`, id);
+            await deleteDoc(productDocRef);
+            // TODO: Also delete associated movements and storage image
+            toast({
+                title: "Sucesso!",
+                description: "Produto excluído permanentemente.",
+                className: "bg-green-500 text-white"
+            });
+        } catch (error) {
+            console.error("Error deleting product: ", error);
+            toast({ variant: "destructive", title: "Erro", description: "Não foi possível excluir o produto." });
+        }
+    };
 
     if (loading) {
         return (
@@ -172,7 +240,7 @@ function ProductList() {
     return (
         <div className="space-y-3">
             {products.map((product) => (
-                <ProductCard key={product.id} product={product} />
+                <ProductCard key={product.id} product={product} onDelete={handleDeleteProduct} />
             ))}
         </div>
     );
