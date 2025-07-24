@@ -80,7 +80,7 @@ export default function DashboardPage() {
     const days = differenceInDays(parseISO(p.expiryDate), new Date());
     return days >= 0 && days <= 30;
   }).length;
-  const lowStock = products.filter(p => p.currentStock <= p.minimumStock).length;
+  const lowStock = products.filter(p => p.currentStock <= p.minimumStock && p.currentStock > 0).length;
   const totalValue = products.reduce((sum, p) => sum + (p.costPrice || 0) * p.currentStock, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const nextExpiries = [...products]
@@ -159,3 +159,5 @@ export default function DashboardPage() {
     </div>
   );
 }
+
+    

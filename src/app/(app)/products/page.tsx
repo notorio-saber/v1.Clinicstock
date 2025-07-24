@@ -162,18 +162,16 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
   return (
     <Card>
       <CardContent className="p-3 flex items-start gap-4">
-        <div className="w-16 h-16 relative flex-shrink-0">
-         <Image src={product.photoURL} alt={product.name} fill sizes="64px" className="rounded-md object-cover" data-ai-hint={product['data-ai-hint']} />
-        </div>
+        <Image src={product.photoURL} alt={product.name} width={64} height={64} className="rounded-md object-cover aspect-square flex-shrink-0" data-ai-hint={product['data-ai-hint']} />
         
-        <div className="flex-1 space-y-1">
+        <div className="flex-1 space-y-1 min-w-0">
             <div className='flex justify-between items-start gap-2'>
-                 <h3 className="font-semibold leading-tight flex-1">{product.name}</h3>
+                 <h3 className="font-semibold leading-tight flex-1 truncate">{product.name}</h3>
                  <Badge variant="outline" className={cn("text-xs whitespace-nowrap flex-shrink-0", status.className)}>{status.text}</Badge>
             </div>
-             <p className="text-sm text-muted-foreground">{product.category}</p>
+             <p className="text-sm text-muted-foreground truncate">{product.category}</p>
           
-            <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground pt-2">
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground pt-2">
                 <span>Estoque: <span className="font-medium text-foreground">{product.currentStock} / min: {product.minimumStock}</span></span>
                 <span className={expiryColor}>
                 Val: {new Date(product.expiryDate).toLocaleDateString('pt-BR')}
@@ -379,7 +377,7 @@ export default function ProductsPage() {
     }
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col h-full">
       <div className="sticky top-16 bg-secondary/80 backdrop-blur-sm z-10 -mx-4 px-4 py-3 border-b">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
@@ -409,3 +407,5 @@ export default function ProductsPage() {
     </div>
   );
 }
+
+    
