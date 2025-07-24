@@ -164,16 +164,14 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
       <CardContent className="p-3 flex items-start gap-4">
          <Image src={product.photoURL} alt={product.name} width={64} height={64} className="rounded-md object-cover aspect-square" data-ai-hint={product['data-ai-hint']} />
         
-        <div className="flex-1 space-y-2">
-            <div className='flex justify-between items-start'>
-                <div>
-                     <h3 className="font-semibold leading-tight">{product.name}</h3>
-                     <p className="text-sm text-muted-foreground">{product.category}</p>
-                </div>
-                <Badge variant="outline" className={cn("text-xs whitespace-nowrap", status.className)}>{status.text}</Badge>
+        <div className="flex-1 space-y-1">
+            <div className='flex justify-between items-start gap-2'>
+                 <h3 className="font-semibold leading-tight flex-1">{product.name}</h3>
+                 <Badge variant="outline" className={cn("text-xs whitespace-nowrap flex-shrink-0", status.className)}>{status.text}</Badge>
             </div>
+             <p className="text-sm text-muted-foreground">{product.category}</p>
           
-            <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground pt-1">
+            <div className="flex items-center justify-between gap-4 text-sm text-muted-foreground pt-2">
                 <span>Estoque: <span className="font-medium text-foreground">{product.currentStock} / min: {product.minimumStock}</span></span>
                 <span className={expiryColor}>
                 Val: {new Date(product.expiryDate).toLocaleDateString('pt-BR')}
@@ -185,7 +183,7 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
             <Sheet open={!!sheetType} onOpenChange={(isOpen) => !isOpen && setSheetType(null)}>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className='-mr-2 -mt-1 h-8 w-8'>
+                        <Button variant="ghost" size="icon" className='-mr-2 -mt-1 h-8 w-8 flex-shrink-0'>
                             <MoreVertical className="h-5 w-5" />
                         </Button>
                     </DropdownMenuTrigger>
@@ -244,29 +242,6 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
   )
 }
 
-function ProductList({ products }: { products: Product[] }) {
-    if (products.length === 0) {
-        return (
-            <div className="text-center py-16">
-                <Package className="mx-auto h-12 w-12 text-muted-foreground" />
-                <h3 className="mt-4 text-lg font-semibold">Nenhum resultado encontrado</h3>
-                <p className="mt-1 text-sm text-muted-foreground">Tente ajustar sua busca ou filtros.</p>
-            </div>
-        )
-    }
-
-    const handleDeleteProduct = async (id: string) => {
-        // Esta função será passada como prop, a lógica está no componente pai
-    };
-
-    return (
-        <div className="space-y-3">
-            {products.map((product) => (
-                <ProductCard key={product.id} product={product} onDelete={() => Promise.resolve()} />
-            ))}
-        </div>
-    );
-}
 
 export default function ProductsPage() {
     const { user } = useAuth();
@@ -349,15 +324,18 @@ export default function ProductsPage() {
     const renderContent = () => {
       if (loading) {
           return (
-              <div className="space-y-3">
+              <div className="space-y-3 pt-4">
                   {[...Array(3)].map((_, i) => (
                       <Card key={i}>
-                          <CardContent className="p-4 flex items-center gap-4">
-                             <Skeleton className="h-16 w-16 rounded-full" />
-                              <div className="flex-1 space-y-2">
+                          <CardContent className="p-3 flex items-start gap-4">
+                             <Skeleton className="h-[64px] w-[64px] rounded-md" />
+                              <div className="flex-1 space-y-2 pt-1">
                                   <Skeleton className="h-4 w-3/4" />
                                   <Skeleton className="h-4 w-1/2" />
-                                  <Skeleton className="h-4 w-2/3" />
+                                  <div className="flex justify-between pt-2">
+                                    <Skeleton className="h-4 w-1/3" />
+                                    <Skeleton className="h-4 w-1/4" />
+                                  </div>
                               </div>
                           </CardContent>
                       </Card>
@@ -368,7 +346,7 @@ export default function ProductsPage() {
   
       if (products.length === 0) {
           return (
-              <div className="text-center py-16">
+              <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed bg-card p-12 text-center mt-4">
                   <Package className="mx-auto h-12 w-12 text-muted-foreground" />
                   <h3 className="mt-4 text-lg font-semibold">Nenhum produto cadastrado</h3>
                   <p className="mt-1 text-sm text-muted-foreground">Comece a adicionar produtos para vê-los aqui.</p>
@@ -381,7 +359,7 @@ export default function ProductsPage() {
 
       if (filteredProducts.length === 0) {
         return (
-            <div className="text-center py-16">
+             <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed bg-card p-12 text-center mt-4">
                 <Package className="mx-auto h-12 w-12 text-muted-foreground" />
                 <h3 className="mt-4 text-lg font-semibold">Nenhum resultado encontrado</h3>
                 <p className="mt-1 text-sm text-muted-foreground">Tente ajustar sua busca ou filtros.</p>
@@ -390,7 +368,7 @@ export default function ProductsPage() {
     }
   
       return (
-          <div className="space-y-3">
+          <div className="space-y-3 pt-4">
               {filteredProducts.map((product) => (
                   <ProductCard key={product.id} product={product} onDelete={handleDeleteProduct} />
               ))}
@@ -399,8 +377,8 @@ export default function ProductsPage() {
     }
 
   return (
-    <div className="space-y-4">
-      <div className="sticky top-16 bg-secondary/80 backdrop-blur-sm z-10 -mx-4 px-4 py-3 -mt-4 border-b">
+    <div className="flex flex-col">
+      <div className="sticky top-16 bg-secondary/80 backdrop-blur-sm z-10 -mx-4 px-4 py-3 border-b">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
@@ -423,7 +401,9 @@ export default function ProductsPage() {
           ))}
         </div>
       </div>
-      {renderContent()}
+      <div className="flex-1 overflow-y-auto">
+        {renderContent()}
+      </div>
     </div>
   );
 }

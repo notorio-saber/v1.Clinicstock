@@ -331,8 +331,8 @@ export default function NewProductPage() {
             </CardContent>
           </Card>
 
-          <div className="fixed bottom-20 left-0 right-0 z-20 md:max-w-3xl md:mx-auto md:left-auto">
-            <div className="bg-background/80 p-4 backdrop-blur-sm">
+           <div className="fixed bottom-0 left-0 right-0 z-20 border-t bg-background/95 pb-[72px] md:max-w-3xl md:mx-auto md:left-auto">
+             <div className="container mx-auto max-w-3xl p-4">
                 <Button type="submit" size="lg" className="w-full" disabled={isSaving}>
                   {isSaving ? (
                     <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Salvando...</>
