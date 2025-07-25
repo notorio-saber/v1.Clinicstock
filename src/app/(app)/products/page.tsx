@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, query, deleteDoc, doc, addDoc } from 'firebase/firestore';
-import { db, storage, runTransaction } from '@/lib/firebase';
+import { collection, onSnapshot, query, deleteDoc, doc, writeBatch } from 'firebase/firestore';
+import { db, storage } from '@/lib/firebase';
 import useAuth from '@/hooks/useAuth';
 import Link from 'next/link';
+import Image from 'next/image';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,7 +13,6 @@ import { Search, MoreVertical, Edit, ArrowUp, ArrowDown, Package, Trash2, Loader
 import type { Product, StockMovement } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import Image from 'next/image';
 import { differenceInDays, parseISO } from 'date-fns';
 import {
     DropdownMenu,
@@ -27,8 +27,6 @@ import {
     SheetDescription,
     SheetHeader,
     SheetTitle,
-    SheetTrigger,
-    SheetClose,
 } from '@/components/ui/sheet';
 import {
   AlertDialog,
@@ -47,6 +45,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { deleteObject, ref } from 'firebase/storage';
 
 const getStatus = (product: Product): { text: string; className: string } => {
     const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
@@ -81,35 +80,32 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
 
         setIsSaving(true);
         try {
-             await runTransaction(db, async (transaction) => {
-                const productDocRef = doc(db, `users/${user.uid}/products`, product.id);
-                const productDoc = await transaction.get(productDocRef);
-                if (!productDoc.exists()) {
-                    throw new Error("Produto não encontrado!");
-                }
+            const batch = writeBatch(db);
+            const productDocRef = doc(db, `users/${user.uid}/products`, product.id);
+            
+            const previousStock = product.currentStock;
+            const newStock = type === 'entrada' ? previousStock + quantity : previousStock - quantity;
 
-                const currentData = productDoc.data() as Product;
-                const previousStock = currentData.currentStock;
-                const newStock = type === 'entrada' ? previousStock + quantity : previousStock - quantity;
+            // 1. Atualizar estoque do produto
+            batch.update(productDocRef, { currentStock: newStock });
 
-                // 1. Atualizar estoque do produto
-                transaction.update(productDocRef, { currentStock: newStock });
-
-                // 2. Criar registro de movimentação
-                const movementCollectionRef = collection(db, `users/${user.uid}/movements`);
-                const movementData: Omit<StockMovement, 'id'> = {
-                    productId: product.id,
-                    productName: product.name,
-                    type,
-                    quantity,
-                    reason: type === 'entrada' ? 'Entrada Manual' : 'Saída Manual',
-                    date: new Date().toISOString(),
-                    previousStock,
-                    newStock,
-                    notes,
-                };
-                transaction.set(doc(movementCollectionRef), movementData);
-            });
+            // 2. Criar registro de movimentação
+            const movementCollectionRef = collection(db, `users/${user.uid}/movements`);
+            const newMovementRef = doc(movementCollectionRef);
+            const movementData: Omit<StockMovement, 'id'> = {
+                productId: product.id,
+                productName: product.name,
+                type,
+                quantity,
+                reason: type === 'entrada' ? 'Entrada Manual' : 'Saída Manual',
+                date: new Date().toISOString(),
+                previousStock,
+                newStock,
+                notes,
+            };
+            batch.set(newMovementRef, movementData);
+            
+            await batch.commit();
 
             toast({
                 title: 'Sucesso!',
@@ -144,7 +140,7 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
     )
 }
 
-function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: string) => Promise<void> }) {
+function ProductCard({ product, onDelete }: { product: Product, onDelete: (product: Product) => Promise<void> }) {
   const status = getStatus(product);
   const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
   const [isDeleting, setIsDeleting] = useState(false);
@@ -156,7 +152,7 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
 
   const handleDelete = async () => {
     setIsDeleting(true);
-    await onDelete(product.id);
+    await onDelete(product);
   };
 
   return (
@@ -208,7 +204,7 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (id: s
                     </DropdownMenuContent>
                 </DropdownMenu>
                 
-                <SheetContent>
+                <SheetContent onOpenAutoFocus={(e) => e.preventDefault()}>
                     <SheetHeader>
                         <SheetTitle>
                           {sheetType === 'entrada' ? `Registrar Entrada: ${product.name}` : `Registrar Saída: ${product.name}`}
@@ -301,15 +297,19 @@ export default function ProductsPage() {
     }, [products, searchTerm, activeFilter]);
 
 
-    const handleDeleteProduct = async (id: string) => {
+    const handleDeleteProduct = async (product: Product) => {
         if (!user) {
             toast({ variant: "destructive", title: "Erro", description: "Usuário não autenticado." });
             return;
         }
         try {
-            // TODO: Also delete associated movements and storage image
-            // For now, let's just delete the product to test
-            const productDocRef = doc(db, `users/${user.uid}/products`, id);
+            // Também excluir a imagem do storage
+            if (product.photoURL) {
+                const imageRef = ref(storage, product.photoURL);
+                await deleteObject(imageRef).catch(err => console.warn("Imagem não encontrada no storage, talvez já tenha sido deletada", err));
+            }
+
+            const productDocRef = doc(db, `users/${user.uid}/products`, product.id);
             await deleteDoc(productDocRef);
             
             toast({

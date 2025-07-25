@@ -11,7 +11,6 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -30,7 +29,7 @@ const productSchema = z.object({
   currentStock: z.coerce.number().min(0, 'O estoque não pode ser negativo.'),
   minimumStock: z.coerce.number().min(0, 'O estoque mínimo não pode ser negativo.').optional(),
   unit: z.string({ required_error: 'Selecione uma unidade.' }),
-  expiryDate: z.string().refine((val) => !isNaN(Date.parse(val)), { message: "Data de validade inválida." }),
+  expiryDate: z.string().refine((val) => val && !isNaN(Date.parse(val)), { message: "Data de validade inválida ou não preenchida." }),
   batchNumber: z.string().optional(),
   supplier: z.string().optional(),
   costPrice: z.coerce.number().min(0, 'O preço de custo não pode ser negativo.').optional(),
@@ -88,16 +87,15 @@ export default function NewProductPage() {
 
     setIsSaving(true);
     try {
-      // Create a reference for the new product to get its ID
       const newProductDocRef = doc(collection(db, `users/${user.uid}/products`));
       const productId = newProductDocRef.id;
 
-      // Upload image to Storage
+      // 1. Upload image to Storage
       const imageRef = ref(storage, `users/${user.uid}/products/${productId}/${imageFile.name}`);
       const uploadResult = await uploadBytes(imageRef, imageFile);
       const photoURL = await getDownloadURL(uploadResult.ref);
 
-      // Prepare product data with the photo URL
+      // 2. Prepare product data and movement data
       const productData: Product = {
         ...data,
         id: productId,
@@ -105,13 +103,12 @@ export default function NewProductPage() {
         'data-ai-hint': 'product bottle', // Placeholder hint
       };
       
-      // Use a batch to write product and movement atomically
       const batch = writeBatch(db);
-
-      // 1. Create the product document
+      
+      // 3. Set the product document in the batch
       batch.set(newProductDocRef, productData);
 
-      // 2. Create the initial stock movement if stock is > 0
+      // 4. Create the initial stock movement if stock is > 0
       if (data.currentStock > 0) {
           const movementRef = doc(collection(db, `users/${user.uid}/movements`));
           const movementData: Omit<StockMovement, 'id'> = {
@@ -128,7 +125,7 @@ export default function NewProductPage() {
           batch.set(movementRef, movementData);
       }
       
-      // Commit the batch
+      // 5. Commit the batch
       await batch.commit();
 
       toast({

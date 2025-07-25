@@ -59,11 +59,10 @@ export default function ProfilePage() {
   const handleSave = async () => {
       if (!user) return;
       
-      const changesToSave = 
-        displayName !== (user.displayName || '') ||
-        imageFile;
+      const hasDisplayNameChanged = displayName !== (user.displayName || '');
+      const hasNewImage = !!imageFile;
 
-      if (!changesToSave) {
+      if (!hasDisplayNameChanged && !hasNewImage) {
           toast({ title: 'Nenhuma alteração', description: 'Não há novas informações para salvar.' });
           return;
       }
@@ -72,21 +71,24 @@ export default function ProfilePage() {
       try {
           let photoURL = user.photoURL;
 
-          if (imageFile) {
+          // Step 1: Upload new image if it exists
+          if (hasNewImage && imageFile) {
               const imageRef = ref(storage, `users/${user.uid}/profile-picture`);
               await uploadBytes(imageRef, imageFile);
               photoURL = await getDownloadURL(imageRef);
           }
 
+          // Step 2: Update Firebase Auth profile
           await updateProfile(user, {
-              displayName,
-              photoURL,
+              displayName: displayName,
+              photoURL: photoURL,
           });
 
-          await reloadUser(); // Force a reload of user data
+          // Step 3: Force a reload of user data in the app
+          await reloadUser();
           
           toast({ title: 'Sucesso!', description: 'Perfil atualizado.', className: 'bg-green-500 text-white' });
-          setImageFile(null); // Reset file input after saving
+          setImageFile(null); // Reset file input after successful save
           
       } catch (error) {
           console.error("Error updating profile: ", error);
