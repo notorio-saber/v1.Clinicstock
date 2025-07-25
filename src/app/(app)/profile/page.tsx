@@ -10,13 +10,11 @@ import { Separator } from '@/components/ui/separator';
 import { Save, Shield, Bell, LogOut, Loader2, Upload } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
 import { signOut, updateProfile } from 'firebase/auth';
-import { getFirebaseAuth, getFirebaseStorage } from '@/lib/firebase';
+import { auth, storage } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Skeleton } from '@/components/ui/skeleton';
-
-export const dynamic = 'force-dynamic';
 
 export default function ProfilePage() {
   const { user, loading: authLoading, reloadUser } = useAuth();
@@ -37,7 +35,6 @@ export default function ProfilePage() {
   }, [user]);
 
   const handleLogout = async () => {
-    const auth = getFirebaseAuth();
     try {
       await signOut(auth);
       router.push('/login');
@@ -73,8 +70,6 @@ export default function ProfilePage() {
       setIsSaving(true);
       try {
           let photoURL = user.photoURL;
-          const storage = getFirebaseStorage();
-          const auth = getFirebaseAuth();
 
           // Step 1: Upload new image if it exists
           if (hasNewImage && imageFile) {

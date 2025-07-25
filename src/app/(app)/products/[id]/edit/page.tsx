@@ -17,13 +17,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import useAuth from '@/hooks/useAuth';
-import { getFirestoreDb, getFirebaseStorage } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-
-export const dynamic = 'force-dynamic';
 
 const productSchema = z.object({
   name: z.string().min(3, { message: 'O nome do produto é obrigatório.' }),
@@ -61,7 +59,6 @@ export default function EditProductPage() {
 
   useEffect(() => {
     if (!user || !productId) return;
-    const db = getFirestoreDb();
     const fetchProduct = async () => {
       setLoading(true);
       try {
@@ -109,8 +106,6 @@ export default function EditProductPage() {
     
     setIsSaving(true);
     try {
-      const db = getFirestoreDb();
-      const storage = getFirebaseStorage();
       let photoURL = product.photoURL;
 
       if (imageFile) {

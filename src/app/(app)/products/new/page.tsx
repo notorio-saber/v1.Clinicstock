@@ -16,12 +16,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import useAuth from '@/hooks/useAuth';
-import { getFirestoreDb, getFirebaseStorage } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { doc, collection, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product, StockMovement } from '@/lib/types';
-
-export const dynamic = 'force-dynamic';
 
 const productSchema = z.object({
   name: z.string().min(3, { message: 'O nome do produto é obrigatório.' }),
@@ -92,9 +90,6 @@ export default function NewProductPage() {
     }
 
     try {
-      const db = getFirestoreDb();
-      const storage = getFirebaseStorage();
-      
       // Step 1: Upload Image
       const newProductDocRef = doc(collection(db, `users/${user.uid}/products`));
       const productId = newProductDocRef.id;

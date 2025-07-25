@@ -10,10 +10,8 @@ import Image from 'next/image';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import useAuth from '@/hooks/useAuth';
 import { collection, onSnapshot, query } from 'firebase/firestore';
-import { getFirestoreDb } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
-
-export const dynamic = 'force-dynamic';
 
 type AlertType = 'expired' | 'expiring_7' | 'expiring_30' | 'low_stock';
 
@@ -55,7 +53,6 @@ export default function AlertsPage() {
     useEffect(() => {
         if (!user) return;
         setLoading(true);
-        const db = getFirestoreDb();
         const productsCollectionRef = collection(db, `users/${user.uid}/products`);
         const q = query(productsCollectionRef);
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { getFirebaseAuth } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { useRouter, usePathname } from 'next/navigation';
 
 export default function useAuth() {
@@ -12,7 +12,6 @@ export default function useAuth() {
   const pathname = usePathname();
 
   const reloadUser = async () => {
-    const auth = getFirebaseAuth();
     if (auth.currentUser) {
       await auth.currentUser.reload();
       setUser(auth.currentUser);
@@ -20,7 +19,6 @@ export default function useAuth() {
   }
 
   useEffect(() => {
-    const auth = getFirebaseAuth();
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);

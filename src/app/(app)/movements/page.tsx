@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { getFirestoreDb } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import useAuth from '@/hooks/useAuth';
 
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,6 @@ import { ArrowDown, ArrowUp, Search, Package } from 'lucide-react';
 import type { StockMovement } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-
-export const dynamic = 'force-dynamic';
 
 function MovementCard({ movement }: { movement: StockMovement }) {
     const isEntry = movement.type === 'entrada';
@@ -60,7 +58,6 @@ export default function MovementsPage() {
 
     useEffect(() => {
         if (!user) return;
-        const db = getFirestoreDb();
         setLoading(true);
         const movementsCollectionRef = collection(db, `users/${user.uid}/movements`);
         const q = query(movementsCollectionRef, orderBy('date', 'desc'));
