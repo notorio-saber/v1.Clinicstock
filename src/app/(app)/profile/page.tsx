@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { Save, Shield, Bell, LogOut, Loader2, Upload } from 'lucide-react';
+import { Save, Shield, LogOut, Loader2, Upload } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
 import { signOut, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, storage } from '@/lib/firebase';
@@ -115,13 +114,6 @@ export default function ProfilePage() {
     }
   };
 
-  const handleNotImplemented = () => {
-    toast({
-      title: 'Em breve!',
-      description: 'Esta funcionalidade ainda está em desenvolvimento.',
-    });
-  };
-
   if (authLoading || !user) {
       return (
            <div className="space-y-6">
@@ -205,11 +197,6 @@ export default function ProfilePage() {
            <Button variant="ghost" className="w-full justify-start p-4" onClick={handlePasswordReset}>
              <Shield className="mr-3 h-5 w-5" />
              Segurança e Senha
-           </Button>
-           <Separator />
-           <Button variant="ghost" className="w-full justify-start p-4" onClick={handleNotImplemented}>
-             <Bell className="mr-3 h-5 w-5" />
-             Notificações
            </Button>
         </CardContent>
       </Card>
