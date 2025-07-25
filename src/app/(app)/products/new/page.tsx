@@ -77,7 +77,6 @@ export default function NewProductPage() {
 
   const onSubmit = async (data: ProductFormValues) => {
     setIsSaving(true);
-    toast({ title: "Iniciando processo de salvar...", description: "Etapa 1: Validação" });
     
     if (!user) {
       toast({ variant: 'destructive', title: 'Erro de Autenticação', description: 'Usuário não encontrado. Faça login novamente.' });
@@ -93,7 +92,6 @@ export default function NewProductPage() {
 
     try {
       // Step 1: Upload Image
-      toast({ title: "Salvando...", description: "Etapa 2: Fazendo upload da imagem..." });
       const newProductDocRef = doc(collection(db, `users/${user.uid}/products`));
       const productId = newProductDocRef.id;
       const imageRef = ref(storage, `users/${user.uid}/products/${productId}/${imageFile.name}`);
@@ -101,11 +99,7 @@ export default function NewProductPage() {
       const uploadResult = await uploadBytes(imageRef, imageFile);
       const photoURL = await getDownloadURL(uploadResult.ref);
       
-      toast({ title: "Upload Completo!", description: `URL: ${photoURL.substring(0, 30)}...` });
-      
-      // Step 2: Prepare data and write to Firestore
-      toast({ title: "Salvando...", description: "Etapa 3: Gravando dados no banco de dados..." });
-
+      // Step 2: Prepare data and write to Firestore using a batch
       const productData: Omit<Product, 'id'> = {
         name: data.name,
         category: data.category as any,
