@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Boxes, ArrowRightLeft, Bell, Beaker } from 'lucide-react';
+import { LayoutDashboard, Boxes, ArrowRightLeft, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const navItems = [
@@ -10,7 +10,6 @@ const navItems = [
   { href: '/products', label: 'Produtos', icon: Boxes },
   { href: '/movements', label: 'Movimentos', icon: ArrowRightLeft },
   { href: '/alerts', label: 'Alertas', icon: Bell },
-  { href: '/test', label: 'Diagnóstico', icon: Beaker },
 ];
 
 export default function BottomNav() {
@@ -18,7 +17,7 @@ export default function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-10 border-t bg-card">
-      <div className="container mx-auto grid h-[72px] max-w-3xl grid-cols-5 items-center justify-around">
+      <div className="container mx-auto grid h-[72px] max-w-3xl grid-cols-4 items-center justify-around">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (
