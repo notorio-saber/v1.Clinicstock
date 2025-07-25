@@ -16,8 +16,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import useAuth from '@/hooks/useAuth';
-import { db, storage, writeBatch } from '@/lib/firebase';
-import { doc, collection } from 'firebase/firestore';
+import { db, storage } from '@/lib/firebase';
+import { doc, collection, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product, StockMovement } from '@/lib/types';
 
@@ -76,35 +76,44 @@ export default function NewProductPage() {
   const triggerFileSelect = () => fileInputRef.current?.click();
 
   const onSubmit = async (data: ProductFormValues) => {
+    setIsSaving(true);
+    toast({ title: "Iniciando processo de salvar...", description: "Etapa 1: Validação" });
+    
     if (!user) {
-      toast({ variant: 'destructive', title: 'Erro', description: 'Você precisa estar logado para salvar um produto.' });
+      toast({ variant: 'destructive', title: 'Erro de Autenticação', description: 'Usuário não encontrado. Faça login novamente.' });
+      setIsSaving(false);
       return;
     }
+    
     if (!imageFile) {
       toast({ variant: 'destructive', title: 'Foto ausente', description: 'Por favor, adicione uma foto para o produto.' });
+      setIsSaving(false);
       return;
     }
 
-    setIsSaving(true);
     try {
-      // Create a reference for the new product to get its ID
+      // Step 1: Upload Image
+      toast({ title: "Salvando...", description: "Etapa 2: Fazendo upload da imagem..." });
       const newProductDocRef = doc(collection(db, `users/${user.uid}/products`));
       const productId = newProductDocRef.id;
-
-      // 1. Upload image to Storage
       const imageRef = ref(storage, `users/${user.uid}/products/${productId}/${imageFile.name}`);
+      
       const uploadResult = await uploadBytes(imageRef, imageFile);
       const photoURL = await getDownloadURL(uploadResult.ref);
+      
+      toast({ title: "Upload Completo!", description: `URL: ${photoURL.substring(0, 30)}...` });
+      
+      // Step 2: Prepare data and write to Firestore
+      toast({ title: "Salvando...", description: "Etapa 3: Gravando dados no banco de dados..." });
 
-      // 2. Prepare product data
       const productData: Omit<Product, 'id'> = {
         name: data.name,
-        category: data.category as any, // Zod ensures this is valid
+        category: data.category as any,
         photoURL,
-        'data-ai-hint': 'product bottle', // Placeholder hint
+        'data-ai-hint': 'product bottle',
         currentStock: data.currentStock,
         minimumStock: data.minimumStock,
-        unit: data.unit as any, // Zod ensures this is valid
+        unit: data.unit as any,
         expiryDate: data.expiryDate,
         batchNumber: data.batchNumber || '',
         supplier: data.supplier || '',
@@ -114,10 +123,8 @@ export default function NewProductPage() {
       
       const batch = writeBatch(db);
       
-      // 3. Set the product document in the batch
       batch.set(newProductDocRef, productData);
 
-      // 4. Create the initial stock movement if stock is > 0
       if (data.currentStock > 0) {
           const movementRef = doc(collection(db, `users/${user.uid}/movements`));
           const movementData: Omit<StockMovement, 'id'> = {
@@ -134,7 +141,6 @@ export default function NewProductPage() {
           batch.set(movementRef, movementData);
       }
       
-      // 5. Commit the batch
       await batch.commit();
 
       toast({
@@ -144,9 +150,14 @@ export default function NewProductPage() {
       });
       router.push('/products');
 
-    } catch (error) {
-      console.error("Erro ao salvar produto: ", error);
-      toast({ variant: 'destructive', title: 'Erro ao salvar', description: 'Não foi possível salvar o produto. Tente novamente.' });
+    } catch (error: any) {
+        console.error("Erro detalhado ao salvar produto: ", error);
+        toast({ 
+            variant: 'destructive', 
+            title: 'Erro Crítico ao Salvar', 
+            description: `Ocorreu um erro: ${error.message}. Verifique o console para mais detalhes.`,
+            duration: 9000
+        });
     } finally {
       setIsSaving(false);
     }
