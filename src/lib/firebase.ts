@@ -7,7 +7,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyB0ae8Sx_tquzgYaukQj_S4YFNj-RMXbX8",
   authDomain: "clinicstock.firebaseapp.com",
   projectId: "clinicstock",
-  storageBucket: "clinicstock.appspot.com",
+  storageBucket: "clinicstock.firebasestorage.app",
   messagingSenderId: "148870614912",
   appId: "1:148870614912:web:be87f6b3b8ecb599c33b65"
 };
