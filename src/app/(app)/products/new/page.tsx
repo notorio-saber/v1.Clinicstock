@@ -16,8 +16,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import useAuth from '@/hooks/useAuth';
-import { db, storage } from '@/lib/firebase';
-import { doc, collection, writeBatch } from 'firebase/firestore';
+import { db, storage, writeBatch } from '@/lib/firebase';
+import { doc, collection } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product, StockMovement } from '@/lib/types';
 

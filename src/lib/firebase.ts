@@ -1,7 +1,7 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, runTransaction } from 'firebase/firestore';
+import { getFirestore, writeBatch } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 // TODO: Add SDKs for Firebase products that you want to use
 // https://firebase.google.com/docs/web/setup#available-libraries
@@ -11,7 +11,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyB0ae8Sx_tquzgYaukQj_S4YFNj-RMXbX8",
   authDomain: "clinicstock.firebaseapp.com",
   projectId: "clinicstock",
-  storageBucket: "clinicstock.firebasestorage.app",
+  storageBucket: "clinicstock.appspot.com",
   messagingSenderId: "148870614912",
   appId: "1:148870614912:web:be87f6b3b8ecb599c33b65"
 };
@@ -23,4 +23,4 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-export { app, auth, db, storage, runTransaction };
+export { app, auth, db, storage, writeBatch };
