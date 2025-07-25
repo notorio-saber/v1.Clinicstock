@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Save, Shield, Bell, LogOut, Loader2, Upload } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
-import { signOut, updateProfile } from 'firebase/auth';
+import { signOut, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, storage } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -98,6 +98,23 @@ export default function ProfilePage() {
       }
   }
 
+  const handlePasswordReset = async () => {
+    if (!user || !user.email) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Usuário ou e-mail não encontrado.' });
+        return;
+    }
+    try {
+        await sendPasswordResetEmail(auth, user.email);
+        toast({
+            title: 'E-mail enviado!',
+            description: `Um link para redefinir sua senha foi enviado para ${user.email}.`,
+        });
+    } catch (error) {
+        console.error("Error sending password reset email:", error);
+        toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível enviar o e-mail de redefinição de senha.' });
+    }
+  };
+
   const handleNotImplemented = () => {
     toast({
       title: 'Em breve!',
@@ -185,7 +202,7 @@ export default function ProfilePage() {
           <CardTitle>Configurações</CardTitle>
         </CardHeader>
         <CardContent className="space-y-1">
-           <Button variant="ghost" className="w-full justify-start p-4" onClick={handleNotImplemented}>
+           <Button variant="ghost" className="w-full justify-start p-4" onClick={handlePasswordReset}>
              <Shield className="mr-3 h-5 w-5" />
              Segurança e Senha
            </Button>
