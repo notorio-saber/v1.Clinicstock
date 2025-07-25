@@ -93,7 +93,7 @@ export default function DashboardPage() {
   return (
     <div className="relative space-y-6">
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="Total de Produtos 🚀" value={String(totalProducts)} icon={Box} color="text-blue-500" loading={loading} />
+        <StatCard title="Total de Produtos 🚀🚀" value={String(totalProducts)} icon={Box} color="text-blue-500" loading={loading} />
         <StatCard title="Vencendo em 30 dias" value={String(expiringSoonCount)} icon={AlertTriangle} color="text-orange-500" loading={loading} />
         <StatCard title="Estoque Baixo" value={String(lowStock)} icon={AlertTriangle} color="text-red-500" loading={loading} />
         <StatCard title="Valor do Estoque" value={totalValue} icon={DollarSign} color="text-green-500" loading={loading} />

@@ -27,13 +27,13 @@ const productSchema = z.object({
   category: z.string({ required_error: 'Selecione uma categoria.' }),
   barcode: z.string().optional(),
   currentStock: z.coerce.number().min(0, 'O estoque não pode ser negativo.'),
-  minimumStock: z.coerce.number().min(0, 'O estoque mínimo não pode ser negativo.').optional(),
+  minimumStock: z.coerce.number().min(0, 'O estoque mínimo não pode ser negativo.').default(0),
   unit: z.string({ required_error: 'Selecione uma unidade.' }),
   expiryDate: z.string().refine((val) => val && !isNaN(Date.parse(val)), { message: "Data de validade inválida ou não preenchida." }),
-  batchNumber: z.string().optional(),
-  supplier: z.string().optional(),
-  costPrice: z.coerce.number().min(0, 'O preço de custo não pode ser negativo.').optional(),
-  notes: z.string().optional(),
+  batchNumber: z.string().optional().default(''),
+  supplier: z.string().optional().default(''),
+  costPrice: z.coerce.number().min(0, 'O preço de custo não pode ser negativo.').optional().default(0),
+  notes: z.string().optional().default(''),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -87,6 +87,7 @@ export default function NewProductPage() {
 
     setIsSaving(true);
     try {
+      // Create a reference for the new product to get its ID
       const newProductDocRef = doc(collection(db, `users/${user.uid}/products`));
       const productId = newProductDocRef.id;
 
@@ -95,12 +96,20 @@ export default function NewProductPage() {
       const uploadResult = await uploadBytes(imageRef, imageFile);
       const photoURL = await getDownloadURL(uploadResult.ref);
 
-      // 2. Prepare product data and movement data
-      const productData: Product = {
-        ...data,
-        id: productId,
+      // 2. Prepare product data
+      const productData: Omit<Product, 'id'> = {
+        name: data.name,
+        category: data.category as any, // Zod ensures this is valid
         photoURL,
         'data-ai-hint': 'product bottle', // Placeholder hint
+        currentStock: data.currentStock,
+        minimumStock: data.minimumStock,
+        unit: data.unit as any, // Zod ensures this is valid
+        expiryDate: data.expiryDate,
+        batchNumber: data.batchNumber || '',
+        supplier: data.supplier || '',
+        costPrice: data.costPrice || 0,
+        notes: data.notes || '',
       };
       
       const batch = writeBatch(db);

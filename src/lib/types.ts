@@ -6,7 +6,7 @@ export type Product = {
   name: string;
   category: Category;
   photoURL: string;
-  'data-ai-hint'?: string;
+  'data-ai-hint': string;
   currentStock: number;
   minimumStock: number;
   unit: Unit;
