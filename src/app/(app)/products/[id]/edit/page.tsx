@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import useAuth from '@/hooks/useAuth';
-import { db, storage } from '@/lib/firebase';
+import { getFirestoreDb, getFirebaseStorage } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product } from '@/lib/types';
@@ -61,7 +61,7 @@ export default function EditProductPage() {
 
   useEffect(() => {
     if (!user || !productId) return;
-
+    const db = getFirestoreDb();
     const fetchProduct = async () => {
       setLoading(true);
       try {
@@ -109,6 +109,8 @@ export default function EditProductPage() {
     
     setIsSaving(true);
     try {
+      const db = getFirestoreDb();
+      const storage = getFirebaseStorage();
       let photoURL = product.photoURL;
 
       if (imageFile) {

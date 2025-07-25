@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, deleteDoc, doc, writeBatch } from 'firebase/firestore';
-import { db, storage } from '@/lib/firebase';
+import { getFirestoreDb, getFirebaseStorage } from '@/lib/firebase';
 import useAuth from '@/hooks/useAuth';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -82,6 +82,7 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
 
         setIsSaving(true);
         try {
+            const db = getFirestoreDb();
             const batch = writeBatch(db);
             const productDocRef = doc(db, `users/${user.uid}/products`, product.id);
             
@@ -255,6 +256,7 @@ export default function ProductsPage() {
 
     useEffect(() => {
         if (!user) return;
+        const db = getFirestoreDb();
         setLoading(true);
         const productsCollectionRef = collection(db, `users/${user.uid}/products`);
         const q = query(productsCollectionRef);
@@ -305,6 +307,8 @@ export default function ProductsPage() {
             return;
         }
         try {
+            const storage = getFirebaseStorage();
+            const db = getFirestoreDb();
             // Também excluir a imagem do storage
             if (product.photoURL) {
                 const imageRef = ref(storage, product.photoURL);

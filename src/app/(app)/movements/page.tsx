@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getFirestoreDb } from '@/lib/firebase';
 import useAuth from '@/hooks/useAuth';
 
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,7 @@ export default function MovementsPage() {
 
     useEffect(() => {
         if (!user) return;
+        const db = getFirestoreDb();
         setLoading(true);
         const movementsCollectionRef = collection(db, `users/${user.uid}/movements`);
         const q = query(movementsCollectionRef, orderBy('date', 'desc'));

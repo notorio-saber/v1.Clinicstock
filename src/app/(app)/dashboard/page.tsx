@@ -11,7 +11,7 @@ import { differenceInDays, parseISO } from 'date-fns';
 import Image from 'next/image';
 import useAuth from '@/hooks/useAuth';
 import { collection, onSnapshot, query } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { getFirestoreDb } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +59,7 @@ export default function DashboardPage() {
     useEffect(() => {
         if (!user) return;
         setLoading(true);
+        const db = getFirestoreDb();
         const productsCollectionRef = collection(db, `users/${user.uid}/products`);
         const q = query(productsCollectionRef);
 
