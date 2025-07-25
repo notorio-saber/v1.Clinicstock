@@ -21,6 +21,7 @@ import { doc, collection, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product, StockMovement } from '@/lib/types';
 
+export const dynamic = 'force-dynamic';
 
 const productSchema = z.object({
   name: z.string().min(3, { message: 'O nome do produto é obrigatório.' }),

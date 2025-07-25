@@ -15,6 +15,8 @@ import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+
 type StatCardProps = {
   title: string;
   value: string;

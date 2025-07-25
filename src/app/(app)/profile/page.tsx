@@ -16,6 +16,8 @@ import { useRouter } from 'next/navigation';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Skeleton } from '@/components/ui/skeleton';
 
+export const dynamic = 'force-dynamic';
+
 export default function ProfilePage() {
   const { user, loading: authLoading, reloadUser } = useAuth();
   const { toast } = useToast();

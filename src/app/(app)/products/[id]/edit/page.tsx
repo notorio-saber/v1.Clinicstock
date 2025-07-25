@@ -23,6 +23,8 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
+export const dynamic = 'force-dynamic';
+
 const productSchema = z.object({
   name: z.string().min(3, { message: 'O nome do produto é obrigatório.' }),
   category: z.string({ required_error: 'Selecione uma categoria.' }),

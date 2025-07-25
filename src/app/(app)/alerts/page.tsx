@@ -13,6 +13,8 @@ import { collection, onSnapshot, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
 
+export const dynamic = 'force-dynamic';
+
 type AlertType = 'expired' | 'expiring_7' | 'expiring_30' | 'low_stock';
 
 const alertConfig = {

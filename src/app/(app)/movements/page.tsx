@@ -13,6 +13,8 @@ import type { StockMovement } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+
 function MovementCard({ movement }: { movement: StockMovement }) {
     const isEntry = movement.type === 'entrada';
     return (
