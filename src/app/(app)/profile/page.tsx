@@ -26,6 +26,8 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const isPasswordProvider = user?.providerData.some(p => p.providerId === 'password');
+
   useEffect(() => {
     if (user) {
       setDisplayName(user.displayName || '');
@@ -78,10 +80,13 @@ export default function ProfilePage() {
           }
 
           // Step 2: Update Firebase Auth profile
-          await updateProfile(auth.currentUser!, {
-              displayName: displayName,
-              photoURL: photoURL,
-          });
+          if (auth.currentUser) {
+            await updateProfile(auth.currentUser, {
+                displayName: displayName,
+                photoURL: photoURL,
+            });
+          }
+
 
           // Step 3: Force a reload of user data in the app
           await reloadUser();
@@ -189,17 +194,20 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Configurações</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-1">
-           <Button variant="ghost" className="w-full justify-start p-4" onClick={handlePasswordReset}>
-             <Shield className="mr-3 h-5 w-5" />
-             Segurança e Senha
-           </Button>
-        </CardContent>
-      </Card>
+      {isPasswordProvider && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Configurações</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1">
+            <Button variant="ghost" className="w-full justify-start p-4" onClick={handlePasswordReset}>
+              <Shield className="mr-3 h-5 w-5" />
+              Segurança e Senha
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
        <Card>
          <CardContent className="p-3">
              <Button variant="destructive" className="w-full justify-center text-base py-6" onClick={handleLogout}>
