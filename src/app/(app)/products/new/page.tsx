@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
 import useAuth from '@/hooks/useAuth';
-import { db, storage, runTransaction } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { doc, collection, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import type { Product, StockMovement } from '@/lib/types';
@@ -88,13 +88,16 @@ export default function NewProductPage() {
 
     setIsSaving(true);
     try {
-      const newProductRef = doc(collection(db, `users/${user.uid}/products`));
-      const productId = newProductRef.id;
+      // Create a reference for the new product to get its ID
+      const newProductDocRef = doc(collection(db, `users/${user.uid}/products`));
+      const productId = newProductDocRef.id;
 
+      // Upload image to Storage
       const imageRef = ref(storage, `users/${user.uid}/products/${productId}/${imageFile.name}`);
       const uploadResult = await uploadBytes(imageRef, imageFile);
       const photoURL = await getDownloadURL(uploadResult.ref);
 
+      // Prepare product data with the photo URL
       const productData: Product = {
         ...data,
         id: productId,
@@ -102,12 +105,13 @@ export default function NewProductPage() {
         'data-ai-hint': 'product bottle', // Placeholder hint
       };
       
+      // Use a batch to write product and movement atomically
       const batch = writeBatch(db);
 
       // 1. Create the product document
-      batch.set(newProductRef, productData);
+      batch.set(newProductDocRef, productData);
 
-      // 2. Create the initial stock movement entry if stock is > 0
+      // 2. Create the initial stock movement if stock is > 0
       if (data.currentStock > 0) {
           const movementRef = doc(collection(db, `users/${user.uid}/movements`));
           const movementData: Omit<StockMovement, 'id'> = {
@@ -124,8 +128,8 @@ export default function NewProductPage() {
           batch.set(movementRef, movementData);
       }
       
+      // Commit the batch
       await batch.commit();
-
 
       toast({
         title: 'Sucesso!',
