@@ -100,7 +100,7 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
 
             const productUpdateData: Partial<Product> = { currentStock: newStock };
             
-            const movementData: Omit<StockMovement, 'id' | 'newExpiryDate' | 'newBatchNumber' | 'newCostPrice'> & Partial<Pick<StockMovement, 'newExpiryDate' | 'newBatchNumber' | 'newCostPrice'>> = {
+            const baseMovementData: Omit<StockMovement, 'id' | 'newExpiryDate' | 'newBatchNumber' | 'newCostPrice'> = {
                 productId: product.id,
                 productName: product.name,
                 type,
@@ -112,6 +112,8 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
                 notes,
                 professionalName,
             };
+
+            let movementData: StockMovement | Omit<StockMovement, 'id'> = baseMovementData;
 
             if (type === 'entrada') {
                 const newExpiryDate = formData.get('newExpiryDate') as string;
@@ -125,16 +127,21 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
                 }
                 
                 productUpdateData.expiryDate = newExpiryDate;
-                movementData.newExpiryDate = newExpiryDate;
+                
+                const entrySpecificData = {
+                    ...baseMovementData,
+                    newExpiryDate,
+                    newBatchNumber: newBatchNumber || product.batchNumber,
+                    newCostPrice: (newCostPrice && !isNaN(newCostPrice) && newCostPrice > 0) ? newCostPrice : product.costPrice
+                };
 
                 if(newBatchNumber) {
                     productUpdateData.batchNumber = newBatchNumber;
-                    movementData.newBatchNumber = newBatchNumber;
                 }
                 if(newCostPrice && !isNaN(newCostPrice) && newCostPrice > 0) {
                     productUpdateData.costPrice = newCostPrice;
-                    movementData.newCostPrice = newCostPrice;
                 }
+                 movementData = entrySpecificData;
             }
             
             batch.update(productDocRef, productUpdateData);
@@ -440,17 +447,17 @@ export default function ProductsPage() {
     const handleExportCSV = async () => {
         const { unparse } = await import('papaparse');
         const dataToExport = filteredProducts.map(p => ({
-            "Nome": p.name,
-            "Categoria": p.category,
-            "Estoque Atual": p.currentStock,
-            "Estoque Mínimo": p.minimumStock,
-            "Unidade": p.unit,
-            "Data de Validade": new Date(p.expiryDate).toLocaleDateString('pt-BR'),
-            "Lote": p.batchNumber,
-            "Fornecedor": p.supplier,
-            "Preço de Custo": p.costPrice.toFixed(2),
-            "Cód. Barras": p.barcode || '',
-            "Observações": p.notes || '',
+            "Name": p.name,
+            "Category": p.category,
+            "Current Stock": p.currentStock,
+            "Minimum Stock": p.minimumStock,
+            "Unit": p.unit,
+            "Expiry Date": new Date(p.expiryDate).toLocaleDateString('pt-BR'),
+            "Batch Number": p.batchNumber,
+            "Supplier": p.supplier,
+            "Cost Price": p.costPrice.toFixed(2),
+            "Barcode": p.barcode || '',
+            "Notes": p.notes || '',
         }));
 
         const csv = unparse(dataToExport);
@@ -461,7 +468,7 @@ export default function ProductsPage() {
         }
         const url = URL.createObjectURL(blob);
         link.href = url;
-        link.setAttribute('download', `produtos_estoque_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute('download', `stock_products_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

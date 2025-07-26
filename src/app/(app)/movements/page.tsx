@@ -166,18 +166,18 @@ export default function MovementsPage() {
     const handleExportCSV = async () => {
         const { unparse } = await import('papaparse');
         const dataToExport = filteredMovements.map(m => ({
-            "Data": new Date(m.date).toLocaleString('pt-BR'),
-            "Produto": m.productName,
-            "Tipo": m.type === 'entrada' ? 'Entrada' : 'Saída',
-            "Quantidade": m.quantity,
-            "Motivo": m.reason,
-            "Profissional Responsável": m.professionalName || '',
-            "Estoque Anterior": m.previousStock,
-            "Estoque Resultante": m.newStock,
-            "Lote (Entrada)": m.newBatchNumber || '',
-            "Validade (Entrada)": m.newExpiryDate ? new Date(m.newExpiryDate).toLocaleDateString('pt-BR') : '',
-            "Custo (Entrada)": m.newCostPrice ? m.newCostPrice.toFixed(2) : '',
-            "Observações": m.notes || '',
+            "Date": new Date(m.date).toLocaleString('pt-BR'),
+            "Product": m.productName,
+            "Type": m.type === 'entrada' ? 'Entry' : 'Exit',
+            "Quantity": m.quantity,
+            "Reason": m.reason,
+            "Responsible Professional": m.professionalName || '',
+            "Previous Stock": m.previousStock,
+            "New Stock": m.newStock,
+            "Batch (Entry)": m.newBatchNumber || '',
+            "Expiry Date (Entry)": m.newExpiryDate ? new Date(m.newExpiryDate).toLocaleDateString('pt-BR') : '',
+            "Cost (Entry)": m.newCostPrice ? m.newCostPrice.toFixed(2) : '',
+            "Notes": m.notes || '',
         }));
 
         const csv = unparse(dataToExport);
@@ -188,7 +188,7 @@ export default function MovementsPage() {
         }
         const url = URL.createObjectURL(blob);
         link.href = url;
-        link.setAttribute('download', `historico_movimentacoes_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute('download', `movement_history_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -248,7 +248,7 @@ export default function MovementsPage() {
 
     return (
         <div className="space-y-4">
-             <div className="flex justify-between items-start">
+            <div className="flex justify-between items-start">
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">Histórico de Movimentações</h2>
                     <p className="text-muted-foreground">Veja todas as entradas e saídas do seu estoque.</p>
@@ -258,7 +258,7 @@ export default function MovementsPage() {
                     Exportar
                 </Button>
             </div>
-
+            
             <div className="sticky top-16 z-10 bg-secondary/95 backdrop-blur-sm py-3 border-b">
                 <div className="space-y-3">
                     <div className="relative">
