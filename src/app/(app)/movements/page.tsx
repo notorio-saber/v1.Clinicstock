@@ -259,7 +259,7 @@ export default function MovementsPage() {
                 </Button>
             </div>
 
-            <div className="sticky top-16 z-10 -mx-4 -mt-4 border-b bg-secondary/95 px-4 py-3 backdrop-blur-sm">
+            <div className="sticky top-16 z-10 bg-secondary/95 py-3 backdrop-blur-sm space-y-3">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input 
@@ -269,7 +269,7 @@ export default function MovementsPage() {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+                <div className="flex gap-2 overflow-x-auto pb-2">
                     {filters.map((filter) => (
                         <Button 
                             key={filter} 
