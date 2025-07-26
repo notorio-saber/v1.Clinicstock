@@ -259,7 +259,7 @@ export default function MovementsPage() {
                 </Button>
             </div>
 
-            <div className="sticky top-16 bg-secondary/80 backdrop-blur-sm z-10 -mx-4 -mt-4 px-4 py-3">
+            <div className="sticky top-16 z-10 -mx-4 -mt-4 border-b bg-secondary/95 px-4 py-3 backdrop-blur-sm">
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                     <Input 
