@@ -9,7 +9,7 @@ import Image from 'next/image';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, MoreVertical, Edit, ArrowUp, ArrowDown, Package, Trash2, Loader2, Save } from 'lucide-react';
+import { Search, MoreVertical, Edit, ArrowUp, ArrowDown, Package, Trash2, Loader2, Save, FileDown } from 'lucide-react';
 import type { Product, StockMovement, StockMovementReason } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -165,7 +165,7 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
     const defaultReason = type === 'entrada' ? 'Compra' : 'Uso';
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4 max-h-[80vh] overflow-y-auto">
              <div className="space-y-2">
                 <Label htmlFor="quantity">Quantidade*</Label>
                 <Input id="quantity" name="quantity" type="number" placeholder="0" required min="1"/>
@@ -370,7 +370,7 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (produ
                           : 'Remova unidades do estoque (por uso, venda, perda, etc).'}
                   </SheetDescription>
               </SheetHeader>
-              <div className='overflow-y-auto -mr-6 pr-6 max-h-[80vh]'>
+              <div className='overflow-y-auto -mr-6 pr-6'>
                   {sheetType && <MovementForm product={product} type={sheetType} onFinished={() => setSheetType(null)} />}
               </div>
           </SheetContent>
@@ -437,6 +437,35 @@ export default function ProductsPage() {
         });
     }, [products, searchTerm, activeFilter]);
 
+    const handleExportCSV = async () => {
+        const { unparse } = await import('papaparse');
+        const dataToExport = filteredProducts.map(p => ({
+            "Nome": p.name,
+            "Categoria": p.category,
+            "Estoque Atual": p.currentStock,
+            "Estoque Mínimo": p.minimumStock,
+            "Unidade": p.unit,
+            "Data de Validade": new Date(p.expiryDate).toLocaleDateString('pt-BR'),
+            "Lote": p.batchNumber,
+            "Fornecedor": p.supplier,
+            "Preço de Custo": p.costPrice.toFixed(2),
+            "Cód. Barras": p.barcode || '',
+            "Observações": p.notes || '',
+        }));
+
+        const csv = unparse(dataToExport);
+        const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.href) {
+            URL.revokeObjectURL(link.href);
+        }
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.setAttribute('download', `produtos_estoque_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     const handleDeleteProduct = async (product: Product) => {
         if (!user) {
@@ -521,11 +550,17 @@ export default function ProductsPage() {
 
   return (
     <div className="space-y-4">
-       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Meus Produtos</h2>
-        <p className="text-muted-foreground">Gerencie todos os seus itens em um só lugar.</p>
-      </div>
-      <div className="sticky top-16 bg-secondary/95 backdrop-blur-sm z-10 -mx-4 px-4 py-3 border-b -mt-4">
+       <div className="flex justify-between items-start">
+            <div>
+                <h2 className="text-2xl font-bold tracking-tight">Meus Produtos</h2>
+                <p className="text-muted-foreground">Gerencie todos os seus itens em um só lugar.</p>
+            </div>
+            <Button variant="outline" onClick={handleExportCSV} disabled={filteredProducts.length === 0} className="flex-shrink-0">
+                <FileDown className="mr-2 h-4 w-4" />
+                Exportar
+            </Button>
+        </div>
+      <div className="sticky top-16 bg-secondary/95 backdrop-blur-sm z-10 py-3 border-b">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
           <Input 
