@@ -208,25 +208,29 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (produ
   return (
     <Dialog>
         <Card>
-            <CardContent className="p-3 flex items-start gap-4">
-                <div className="relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden bg-muted">
-                    {product.photoURL && <Image src={product.photoURL} alt={product.name} fill className="object-cover" data-ai-hint={product['data-ai-hint']} />}
-                </div>
-                
-                <div className="flex-1 space-y-1 min-w-0">
-                    <div className='flex justify-between items-start gap-2'>
-                        <h3 className="font-semibold leading-tight flex-1 truncate">{product.name}</h3>
-                        <Badge variant="outline" className={cn("text-xs whitespace-nowrap flex-shrink-0", status.className)}>{status.text}</Badge>
+            <CardContent className="p-3 flex items-start gap-3">
+                <DialogTrigger asChild>
+                    <div className="flex flex-1 items-start gap-3 cursor-pointer min-w-0">
+                        <div className="relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden bg-muted">
+                            {product.photoURL && <Image src={product.photoURL} alt={product.name} fill className="object-cover" data-ai-hint={product['data-ai-hint']} />}
+                        </div>
+                        
+                        <div className="flex-1 space-y-1 min-w-0">
+                            <div className='flex justify-between items-start gap-2'>
+                                <h3 className="font-semibold leading-tight flex-1 truncate">{product.name}</h3>
+                                <Badge variant="outline" className={cn("text-xs whitespace-nowrap flex-shrink-0", status.className)}>{status.text}</Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground truncate">{product.category}</p>
+                        
+                            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground pt-2">
+                                <span>Estoque: <span className="font-medium text-foreground">{product.currentStock} / min: {product.minimumStock}</span></span>
+                                <span className={expiryColor}>
+                                Val: {new Date(product.expiryDate).toLocaleDateString('pt-BR')}
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                    <p className="text-sm text-muted-foreground truncate">{product.category}</p>
-                
-                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground pt-2">
-                        <span>Estoque: <span className="font-medium text-foreground">{product.currentStock} / min: {product.minimumStock}</span></span>
-                        <span className={expiryColor}>
-                        Val: {new Date(product.expiryDate).toLocaleDateString('pt-BR')}
-                        </span>
-                    </div>
-                </div>
+                </DialogTrigger>
 
                 <AlertDialog>
                     <Sheet open={!!sheetType} onOpenChange={(isOpen) => !isOpen && setSheetType(null)}>
@@ -237,9 +241,6 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (produ
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DialogTrigger asChild>
-                                    <DropdownMenuItem><Eye className="mr-2 h-4 w-4"/>Ver Detalhes</DropdownMenuItem>
-                                </DialogTrigger>
                                 <DropdownMenuItem asChild>
                                     <Link href={`/products/${product.id}/edit`}><Edit className="mr-2 h-4 w-4"/>Editar</Link>
                                 </DropdownMenuItem>
