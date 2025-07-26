@@ -77,10 +77,11 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
             const quantity = parseInt(formData.get('quantity') as string, 10);
             const reason = formData.get('reason') as StockMovementReason;
             const professionalName = formData.get('professionalName') as string;
-            const newExpiryDate = formData.get('newExpiryDate') as string;
-            const newBatchNumber = formData.get('newBatchNumber') as string;
-            const newCostPrice = parseFloat((formData.get('newCostPrice') as string || '0').replace(',', '.'));
             const notes = formData.get('notes') as string;
+            
+            let newExpiryDate: string | undefined;
+            let newBatchNumber: string | undefined;
+            let newCostPrice: number | undefined;
 
             if (isNaN(quantity) || quantity <= 0) {
                 toast({ variant: 'destructive', title: 'Erro', description: 'A quantidade deve ser um número positivo.' });
@@ -93,11 +94,18 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
                 setIsSaving(false);
                 return;
             }
-             if (type === 'entrada' && !newExpiryDate) {
-                toast({ variant: 'destructive', title: 'Erro', description: 'A data de validade é obrigatória para entradas.' });
-                setIsSaving(false);
-                return;
+            
+            if (type === 'entrada') {
+                newExpiryDate = formData.get('newExpiryDate') as string;
+                newBatchNumber = formData.get('newBatchNumber') as string;
+                newCostPrice = parseFloat((formData.get('newCostPrice') as string || '0').replace(',', '.'));
+                 if (!newExpiryDate) {
+                    toast({ variant: 'destructive', title: 'Erro', description: 'A data de validade é obrigatória para entradas.' });
+                    setIsSaving(false);
+                    return;
+                }
             }
+
 
             const batch = writeBatch(db);
             const productDocRef = doc(db, `users/${user.uid}/products`, product.id);
@@ -110,7 +118,7 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
             if (type === 'entrada') {
                 if(newExpiryDate) productUpdateData.expiryDate = newExpiryDate;
                 if(newBatchNumber) productUpdateData.batchNumber = newBatchNumber;
-                if(!isNaN(newCostPrice) && newCostPrice > 0) productUpdateData.costPrice = newCostPrice;
+                if(newCostPrice && !isNaN(newCostPrice) && newCostPrice > 0) productUpdateData.costPrice = newCostPrice;
             }
             
             batch.update(productDocRef, productUpdateData);
@@ -183,8 +191,8 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
                     <p className="text-sm font-medium">Informações da Nova Entrada (Opcional)</p>
                     <p className="text-xs text-muted-foreground -mt-3">Preencha para atualizar os dados do produto com os do novo lote.</p>
                      <div className="space-y-2">
-                        <Label htmlFor="newExpiryDate">Nova Data de Validade</Label>
-                        <Input id="newExpiryDate" name="newExpiryDate" type="date" defaultValue={format(new Date(product.expiryDate), 'yyyy-MM-dd')} />
+                        <Label htmlFor="newExpiryDate">Nova Data de Validade*</Label>
+                        <Input id="newExpiryDate" name="newExpiryDate" type="date" defaultValue={format(new Date(), 'yyyy-MM-dd')} required />
                     </div>
                      <div className="space-y-2">
                         <Label htmlFor="newBatchNumber">Novo Lote</Label>
@@ -344,7 +352,7 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (produ
                                         : 'Remova unidades do estoque (por uso, venda, perda, etc).'}
                                 </SheetDescription>
                             </SheetHeader>
-                            <div className='overflow-y-auto -mr-6 pr-6'>
+                            <div className='overflow-y-auto -mr-6 pr-6 max-h-[80vh]'>
                                 {sheetType && <MovementForm product={product} type={sheetType} onFinished={() => setSheetType(null)} />}
                             </div>
                         </SheetContent>
