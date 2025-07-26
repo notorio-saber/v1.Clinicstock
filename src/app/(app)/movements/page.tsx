@@ -248,42 +248,46 @@ export default function MovementsPage() {
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-start">
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">Histórico de Movimentações</h2>
                     <p className="text-muted-foreground">Veja todas as entradas e saídas do seu estoque.</p>
                 </div>
-                 <Button variant="outline" onClick={handleExportCSV} disabled={filteredMovements.length === 0}>
+                 <Button variant="outline" onClick={handleExportCSV} disabled={filteredMovements.length === 0} className="flex-shrink-0">
                     <FileDown className="mr-2 h-4 w-4" />
-                    Exportar CSV
+                    Exportar
                 </Button>
             </div>
 
-            <div className="sticky top-16 z-10 bg-secondary/95 py-3 backdrop-blur-sm space-y-3">
-                <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input 
-                        placeholder="Buscar por produto..." 
-                        className="pl-10" 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-2">
-                    {filters.map((filter) => (
-                        <Button 
-                            key={filter} 
-                            variant={activeFilter === filter ? 'default' : 'outline'} 
-                            className="whitespace-nowrap rounded-full"
-                            onClick={() => setActiveFilter(filter)}
-                        >
-                            {filter}
-                        </Button>
-                    ))}
+            <div className="sticky top-[64px] z-10 bg-secondary/95 py-3 backdrop-blur-sm -mx-4 px-4 border-b">
+                 <div className="space-y-3 max-w-3xl mx-auto">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Input 
+                            placeholder="Buscar por produto..." 
+                            className="pl-10" 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                        {filters.map((filter) => (
+                            <Button 
+                                key={filter} 
+                                variant={activeFilter === filter ? 'default' : 'outline'} 
+                                className="whitespace-nowrap rounded-full"
+                                onClick={() => setActiveFilter(filter)}
+                            >
+                                {filter}
+                            </Button>
+                        ))}
+                    </div>
                 </div>
             </div>
 
-            {renderContent()}
+            <div className="pt-4">
+                {renderContent()}
+            </div>
         </div>
     );
 }
