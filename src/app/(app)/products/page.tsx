@@ -79,10 +79,6 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
             const professionalName = formData.get('professionalName') as string;
             const notes = formData.get('notes') as string;
             
-            let newExpiryDate: string | undefined;
-            let newBatchNumber: string | undefined;
-            let newCostPrice: number | undefined;
-
             if (isNaN(quantity) || quantity <= 0) {
                 toast({ variant: 'destructive', title: 'Erro', description: 'A quantidade deve ser um número positivo.' });
                 setIsSaving(false);
@@ -94,18 +90,6 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
                 setIsSaving(false);
                 return;
             }
-            
-            if (type === 'entrada') {
-                newExpiryDate = formData.get('newExpiryDate') as string;
-                newBatchNumber = formData.get('newBatchNumber') as string;
-                newCostPrice = parseFloat((formData.get('newCostPrice') as string || '0').replace(',', '.'));
-                 if (!newExpiryDate) {
-                    toast({ variant: 'destructive', title: 'Erro', description: 'A data de validade é obrigatória para entradas.' });
-                    setIsSaving(false);
-                    return;
-                }
-            }
-
 
             const batch = writeBatch(db);
             const productDocRef = doc(db, `users/${user.uid}/products`, product.id);
@@ -115,17 +99,7 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
 
             const productUpdateData: Partial<Product> = { currentStock: newStock };
             
-            if (type === 'entrada') {
-                if(newExpiryDate) productUpdateData.expiryDate = newExpiryDate;
-                if(newBatchNumber) productUpdateData.batchNumber = newBatchNumber;
-                if(newCostPrice && !isNaN(newCostPrice) && newCostPrice > 0) productUpdateData.costPrice = newCostPrice;
-            }
-            
-            batch.update(productDocRef, productUpdateData);
-            
-            const movementCollectionRef = collection(db, `users/${user.uid}/movements`);
-            const newMovementRef = doc(movementCollectionRef);
-            
+            // Base movement data object
             const movementData: Omit<StockMovement, 'id'> = {
                 productId: product.id,
                 productName: product.name,
@@ -137,10 +111,37 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
                 newStock,
                 notes,
                 professionalName,
-                newExpiryDate: type === 'entrada' ? newExpiryDate : undefined,
-                newBatchNumber: type === 'entrada' ? newBatchNumber : undefined,
-                newCostPrice: type === 'entrada' ? newCostPrice : undefined,
             };
+
+            if (type === 'entrada') {
+                const newExpiryDate = formData.get('newExpiryDate') as string;
+                const newBatchNumber = formData.get('newBatchNumber') as string;
+                const newCostPrice = parseFloat((formData.get('newCostPrice') as string || '0').replace(',', '.'));
+                 
+                if (!newExpiryDate) {
+                    toast({ variant: 'destructive', title: 'Erro', description: 'A data de validade é obrigatória para entradas.' });
+                    setIsSaving(false);
+                    return;
+                }
+                
+                // Add entry-specific fields to product and movement data
+                productUpdateData.expiryDate = newExpiryDate;
+                movementData.newExpiryDate = newExpiryDate;
+
+                if(newBatchNumber) {
+                    productUpdateData.batchNumber = newBatchNumber;
+                    movementData.newBatchNumber = newBatchNumber;
+                }
+                if(newCostPrice && !isNaN(newCostPrice) && newCostPrice > 0) {
+                    productUpdateData.costPrice = newCostPrice;
+                    movementData.newCostPrice = newCostPrice;
+                }
+            }
+            
+            batch.update(productDocRef, productUpdateData);
+            
+            const movementCollectionRef = collection(db, `users/${user.uid}/movements`);
+            const newMovementRef = doc(movementCollectionRef);
             
             batch.set(newMovementRef, movementData);
             
@@ -155,7 +156,7 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
 
         } catch (error) {
             console.error("Erro ao registrar movimentação: ", error);
-            toast({ variant: 'destructive', title: 'Erro na Transação', description: "Não foi possível registrar a movimentação." });
+            toast({ variant: 'destructive', title: 'Erro na Transação', description: `Não foi possível registrar a movimentação. ${error instanceof Error ? error.message : ''}` });
         } finally {
             setIsSaving(false);
         }
