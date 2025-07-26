@@ -33,8 +33,10 @@ export default function BottomNav() {
         let showAlert = false;
         querySnapshot.forEach((doc) => {
             const p = doc.data() as Product;
+            if (p.currentStock === 0) return; // Ignora alertas de produtos sem estoque
+
             const daysToExpiry = differenceInDays(parseISO(p.expiryDate), new Date());
-            if (daysToExpiry < 30 || (p.currentStock <= p.minimumStock && p.currentStock > 0)) {
+            if (daysToExpiry < 30 || p.currentStock <= p.minimumStock) {
                 showAlert = true;
             }
         });
