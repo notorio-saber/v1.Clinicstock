@@ -67,7 +67,11 @@ export default function EditProductPage() {
         if (productDoc.exists()) {
           const productData = productDoc.data() as Product;
           setProduct(productData);
-          form.reset(productData);
+          form.reset({
+            ...productData,
+            costPrice: productData.costPrice || 0,
+            minimumStock: productData.minimumStock || 0,
+          });
           setImagePreview(productData.photoURL);
         } else {
            toast({ variant: 'destructive', title: 'Erro', description: 'Produto não encontrado.' });
@@ -113,9 +117,20 @@ export default function EditProductPage() {
         const uploadResult = await uploadBytes(imageRef, imageFile);
         photoURL = await getDownloadURL(uploadResult.ref);
       }
+      
+      const productData = {
+          ...data,
+          photoURL,
+          barcode: data.barcode || '',
+          minimumStock: data.minimumStock || 0,
+          batchNumber: data.batchNumber || '',
+          supplier: data.supplier || '',
+          costPrice: data.costPrice || 0,
+          notes: data.notes || '',
+      };
 
       const productDocRef = doc(db, `users/${user.uid}/products`, productId);
-      await updateDoc(productDocRef, { ...data, photoURL });
+      await updateDoc(productDocRef, productData);
 
       toast({
         title: 'Sucesso!',
