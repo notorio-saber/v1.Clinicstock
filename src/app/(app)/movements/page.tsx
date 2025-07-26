@@ -19,16 +19,24 @@ function MovementDetailsDialog({ movement }: { movement: StockMovement }) {
 
     const detailItem = (label: string, value?: string | number | null) => {
         if (!value && value !== 0) return null;
+        let displayValue: React.ReactNode = value;
+        if (label === "Novo Preço de Custo" && typeof value === 'number' && value > 0) {
+             displayValue = `R$ ${value.toFixed(2).replace('.',',')}`;
+        }
+        if (label === "Nova Data de Validade" && typeof value === 'string') {
+            displayValue = new Date(value).toLocaleDateString('pt-BR');
+        }
+
         return (
             <div className="py-2">
                 <p className="text-sm text-muted-foreground">{label}</p>
-                <p className="font-medium">{value}</p>
+                <p className="font-medium">{displayValue}</p>
             </div>
         )
     }
 
     return (
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
             <DialogHeader>
                 <DialogTitle>Detalhes da Movimentação</DialogTitle>
             </DialogHeader>
@@ -48,9 +56,20 @@ function MovementDetailsDialog({ movement }: { movement: StockMovement }) {
                 <div className="grid grid-cols-2 gap-x-4 divide-y">
                     {detailItem("Data", new Date(movement.date).toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short'}))}
                     {detailItem("Motivo", movement.reason)}
+                    {detailItem("Responsável", movement.professionalName)}
                     {detailItem("Estoque Anterior", movement.previousStock)}
                     {detailItem("Estoque Resultante", movement.newStock)}
                 </div>
+
+                {isEntry && (
+                    <>
+                        <div className="grid grid-cols-2 gap-x-4 divide-y pt-2">
+                            {detailItem("Nova Data de Validade", movement.newExpiryDate)}
+                            {detailItem("Novo Lote", movement.newBatchNumber)}
+                            {detailItem("Novo Preço de Custo", movement.newCostPrice)}
+                        </div>
+                    </>
+                )}
 
                 {movement.notes && (
                     <div className="space-y-1 pt-2">

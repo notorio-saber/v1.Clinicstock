@@ -15,6 +15,7 @@ export type Product = {
   supplier: string;
   costPrice: number;
   notes: string;
+  barcode?: string;
 };
 
 export type StockMovementType = 'entrada' | 'saida';
@@ -31,4 +32,8 @@ export type StockMovement = {
   previousStock: number;
   newStock: number;
   notes: string;
+  professionalName?: string;
+  newBatchNumber?: string;
+  newExpiryDate?: string;
+  newCostPrice?: number;
 };

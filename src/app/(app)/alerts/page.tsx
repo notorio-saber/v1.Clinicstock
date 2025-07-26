@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { Product, StockMovement } from '@/lib/types';
-import { differenceInDays, parseISO } from 'date-fns';
+import type { Product, StockMovement, StockMovementReason } from '@/lib/types';
+import { differenceInDays, parseISO, format } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PackagePlus, Trash2, XCircle, Loader2, AlertTriangle, Save } from 'lucide-react';
@@ -18,6 +18,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 type AlertType = 'expired' | 'expiring_7' | 'expiring_30' | 'low_stock';
@@ -29,6 +30,8 @@ const alertConfig = {
     low_stock: { title: 'Estoque Baixo', icon: AlertTriangle, color: 'text-orange-500' },
 };
 
+const entryReasons: StockMovementReason[] = ['Compra', 'Ajuste', 'Entrada Manual'];
+
 function MovementForm({ product, onFinished }: { product: Product, onFinished: () => void }) {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -38,25 +41,44 @@ function MovementForm({ product, onFinished }: { product: Product, onFinished: (
         event.preventDefault();
         if (!user) return;
 
-        const formData = new FormData(event.currentTarget);
-        const quantity = parseInt(formData.get('quantity') as string, 10);
-        const notes = formData.get('notes') as string;
-
-        if (isNaN(quantity) || quantity <= 0) {
-            toast({ variant: 'destructive', title: 'Erro', description: 'A quantidade deve ser um número positivo.' });
-            return;
-        }
-
         setIsSaving(true);
         try {
+            const formData = new FormData(event.currentTarget);
+            const quantity = parseInt(formData.get('quantity') as string, 10);
+            const reason = formData.get('reason') as StockMovementReason;
+            const professionalName = formData.get('professionalName') as string;
+            const newExpiryDate = formData.get('newExpiryDate') as string;
+            const newBatchNumber = formData.get('newBatchNumber') as string;
+            const newCostPrice = parseFloat((formData.get('newCostPrice') as string || '0').replace(',', '.'));
+            const notes = formData.get('notes') as string;
+
+            if (isNaN(quantity) || quantity <= 0) {
+                toast({ variant: 'destructive', title: 'Erro', description: 'A quantidade deve ser um número positivo.' });
+                setIsSaving(false);
+                return;
+            }
+
+            if (!newExpiryDate) {
+                toast({ variant: 'destructive', title: 'Erro', description: 'A data de validade é obrigatória para entradas.' });
+                setIsSaving(false);
+                return;
+            }
+
             const batch = writeBatch(db);
             const productDocRef = doc(db, `users/${user.uid}/products`, product.id);
             
             const previousStock = product.currentStock;
             const newStock = previousStock + quantity;
 
-            batch.update(productDocRef, { currentStock: newStock });
-
+            const productUpdateData: Partial<Product> = { 
+                currentStock: newStock,
+                expiryDate: newExpiryDate,
+                batchNumber: newBatchNumber,
+                costPrice: isNaN(newCostPrice) ? product.costPrice : newCostPrice,
+             };
+            
+            batch.update(productDocRef, productUpdateData);
+            
             const movementCollectionRef = collection(db, `users/${user.uid}/movements`);
             const newMovementRef = doc(movementCollectionRef);
             const movementData: Omit<StockMovement, 'id'> = {
@@ -64,11 +86,15 @@ function MovementForm({ product, onFinished }: { product: Product, onFinished: (
                 productName: product.name,
                 type: 'entrada',
                 quantity,
-                reason: 'Entrada Manual',
+                reason,
                 date: new Date().toISOString(),
                 previousStock,
                 newStock,
                 notes,
+                professionalName,
+                newExpiryDate,
+                newBatchNumber,
+                newCostPrice,
             };
             batch.set(newMovementRef, movementData);
             
@@ -90,14 +116,45 @@ function MovementForm({ product, onFinished }: { product: Product, onFinished: (
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4 max-h-[80vh] overflow-y-auto">
              <SheetHeader className='text-left'>
                 <SheetTitle>Registrar Entrada: {product.name}</SheetTitle>
                 <SheetDescription>Adicione novas unidades ao estoque deste produto.</SheetDescription>
             </SheetHeader>
             <div className="space-y-2">
-                <Label htmlFor="quantity">Quantidade</Label>
+                <Label htmlFor="quantity">Quantidade*</Label>
                 <Input id="quantity" name="quantity" type="number" placeholder="0" required min="1"/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="reason">Motivo*</Label>
+                 <Select name="reason" defaultValue="Compra" required>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Selecione o motivo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {entryReasons.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="professionalName">Profissional Responsável</Label>
+                <Input id="professionalName" name="professionalName" placeholder="Nome do profissional" />
+            </div>
+            <div className='space-y-4 rounded-md border p-4 bg-muted/50'>
+                <p className="text-sm font-medium">Informações da Nova Entrada</p>
+                <p className="text-xs text-muted-foreground -mt-3">Os dados do produto serão atualizados com os do novo lote.</p>
+                    <div className="space-y-2">
+                    <Label htmlFor="newExpiryDate">Nova Data de Validade*</Label>
+                    <Input id="newExpiryDate" name="newExpiryDate" type="date" defaultValue={format(new Date(), 'yyyy-MM-dd')} required />
+                </div>
+                    <div className="space-y-2">
+                    <Label htmlFor="newBatchNumber">Novo Lote</Label>
+                    <Input id="newBatchNumber" name="newBatchNumber" placeholder="Lote do novo produto"/>
+                </div>
+                    <div className="space-y-2">
+                    <Label htmlFor="newCostPrice">Novo Preço de Custo (R$)</Label>
+                    <Input id="newCostPrice" name="newCostPrice" type="number" step="0.01" placeholder="0,00" />
+                </div>
             </div>
             <div className="space-y-2">
                 <Label htmlFor="notes">Observações (Opcional)</Label>
@@ -178,7 +235,7 @@ function AlertCard({ product }: { product: Product }) {
                         <SheetTrigger asChild>
                            <Button variant="outline" size="sm"><PackagePlus className="mr-1 h-3 w-3"/> Entrada</Button>
                         </SheetTrigger>
-                        <SheetContent>
+                        <SheetContent onOpenAutoFocus={(e) => e.preventDefault()}>
                             <MovementForm product={product} onFinished={() => setIsSheetOpen(false)} />
                         </SheetContent>
                     </Sheet>
@@ -254,21 +311,16 @@ export default function AlertsPage() {
              if (p.currentStock === 0) return; // Ignorar produtos com estoque zerado
 
              const daysToExpiry = differenceInDays(parseISO(p.expiryDate), new Date());
-             let hasAlert = false;
 
-            if (p.currentStock <= p.minimumStock) {
+            if (p.currentStock > 0 && p.currentStock <= p.minimumStock) {
                 alerts.low_stock.push(p);
-                hasAlert = true;
             }
             if (daysToExpiry < 0) {
                 alerts.expired.push(p);
-                hasAlert = true;
             } else if (daysToExpiry <= 7) {
                 alerts.expiring_7.push(p);
-                hasAlert = true;
             } else if (daysToExpiry <= 30) {
                 alerts.expiring_30.push(p);
-                hasAlert = true;
             }
         });
         

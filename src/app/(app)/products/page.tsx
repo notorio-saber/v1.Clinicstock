@@ -9,11 +9,11 @@ import Image from 'next/image';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, MoreVertical, Edit, ArrowUp, ArrowDown, Package, Trash2, Loader2, Save, Eye } from 'lucide-react';
-import type { Product, StockMovement } from '@/lib/types';
+import { Search, MoreVertical, Edit, ArrowUp, ArrowDown, Package, Trash2, Loader2, Save } from 'lucide-react';
+import type { Product, StockMovement, StockMovementReason } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { differenceInDays, parseISO } from 'date-fns';
+import { differenceInDays, parseISO, format } from 'date-fns';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -47,6 +47,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { deleteObject, ref } from 'firebase/storage';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const getStatus = (product: Product): { text: string; className: string } => {
     if (product.currentStock === 0) return { text: 'Zerado', className: 'bg-gray-500/20 text-gray-500 border-gray-500/30' };
@@ -57,6 +58,10 @@ const getStatus = (product: Product): { text: string; className: string } => {
     return { text: 'Estoque OK', className: 'bg-green-500/20 text-green-500 border-green-500/30' };
 };
 
+const entryReasons: StockMovementReason[] = ['Compra', 'Ajuste', 'Entrada Manual'];
+const exitReasons: StockMovementReason[] = ['Uso', 'Venda', 'Perda', 'Ajuste', 'Saída Manual'];
+
+
 function MovementForm({ product, type, onFinished }: { product: Product, type: 'entrada' | 'saida', onFinished: () => void }) {
     const { user } = useAuth();
     const { toast } = useToast();
@@ -66,45 +71,69 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
         event.preventDefault();
         if (!user) return;
 
-        const formData = new FormData(event.currentTarget);
-        const quantity = parseInt(formData.get('quantity') as string, 10);
-        const notes = formData.get('notes') as string;
-
-        if (isNaN(quantity) || quantity <= 0) {
-            toast({ variant: 'destructive', title: 'Erro', description: 'A quantidade deve ser um número positivo.' });
-            return;
-        }
-
-        if (type === 'saida' && quantity > product.currentStock) {
-            toast({ variant: 'destructive', title: 'Erro', description: 'A quantidade de saída não pode ser maior que o estoque atual.' });
-            return;
-        }
-
         setIsSaving(true);
         try {
+            const formData = new FormData(event.currentTarget);
+            const quantity = parseInt(formData.get('quantity') as string, 10);
+            const reason = formData.get('reason') as StockMovementReason;
+            const professionalName = formData.get('professionalName') as string;
+            const newExpiryDate = formData.get('newExpiryDate') as string;
+            const newBatchNumber = formData.get('newBatchNumber') as string;
+            const newCostPrice = parseFloat((formData.get('newCostPrice') as string || '0').replace(',', '.'));
+            const notes = formData.get('notes') as string;
+
+            if (isNaN(quantity) || quantity <= 0) {
+                toast({ variant: 'destructive', title: 'Erro', description: 'A quantidade deve ser um número positivo.' });
+                setIsSaving(false);
+                return;
+            }
+
+            if (type === 'saida' && quantity > product.currentStock) {
+                toast({ variant: 'destructive', title: 'Erro', description: 'A quantidade de saída não pode ser maior que o estoque atual.' });
+                setIsSaving(false);
+                return;
+            }
+             if (type === 'entrada' && !newExpiryDate) {
+                toast({ variant: 'destructive', title: 'Erro', description: 'A data de validade é obrigatória para entradas.' });
+                setIsSaving(false);
+                return;
+            }
+
             const batch = writeBatch(db);
             const productDocRef = doc(db, `users/${user.uid}/products`, product.id);
             
             const previousStock = product.currentStock;
             const newStock = type === 'entrada' ? previousStock + quantity : previousStock - quantity;
 
-            // 1. Atualizar estoque do produto
-            batch.update(productDocRef, { currentStock: newStock });
-
-            // 2. Criar registro de movimentação
+            const productUpdateData: Partial<Product> = { currentStock: newStock };
+            
+            if (type === 'entrada') {
+                if(newExpiryDate) productUpdateData.expiryDate = newExpiryDate;
+                if(newBatchNumber) productUpdateData.batchNumber = newBatchNumber;
+                if(!isNaN(newCostPrice) && newCostPrice > 0) productUpdateData.costPrice = newCostPrice;
+            }
+            
+            batch.update(productDocRef, productUpdateData);
+            
             const movementCollectionRef = collection(db, `users/${user.uid}/movements`);
             const newMovementRef = doc(movementCollectionRef);
+            
             const movementData: Omit<StockMovement, 'id'> = {
                 productId: product.id,
                 productName: product.name,
                 type,
                 quantity,
-                reason: type === 'entrada' ? 'Entrada Manual' : 'Saída Manual',
+                reason,
                 date: new Date().toISOString(),
                 previousStock,
                 newStock,
                 notes,
+                professionalName,
+                newExpiryDate: type === 'entrada' ? newExpiryDate : undefined,
+                newBatchNumber: type === 'entrada' ? newBatchNumber : undefined,
+                newCostPrice: type === 'entrada' ? newCostPrice : undefined,
             };
+            
             batch.set(newMovementRef, movementData);
             
             await batch.commit();
@@ -124,26 +153,64 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
         }
     };
 
+    const reasons = type === 'entrada' ? entryReasons : exitReasons;
+    const defaultReason = type === 'entrada' ? 'Compra' : 'Uso';
+
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 p-4">
-            <div className="space-y-2">
-                <Label htmlFor="quantity">Quantidade</Label>
+        <form onSubmit={handleSubmit} className="space-y-4 p-4 max-h-[80vh] overflow-y-auto">
+             <div className="space-y-2">
+                <Label htmlFor="quantity">Quantidade*</Label>
                 <Input id="quantity" name="quantity" type="number" placeholder="0" required min="1"/>
             </div>
             <div className="space-y-2">
+                <Label htmlFor="reason">Motivo*</Label>
+                 <Select name="reason" defaultValue={defaultReason} required>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Selecione o motivo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {reasons.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+             <div className="space-y-2">
+                <Label htmlFor="professionalName">Profissional Responsável</Label>
+                <Input id="professionalName" name="professionalName" placeholder="Nome do profissional" />
+            </div>
+
+            {type === 'entrada' && (
+                <div className='space-y-4 rounded-md border p-4 bg-muted/50'>
+                    <p className="text-sm font-medium">Informações da Nova Entrada (Opcional)</p>
+                    <p className="text-xs text-muted-foreground -mt-3">Preencha para atualizar os dados do produto com os do novo lote.</p>
+                     <div className="space-y-2">
+                        <Label htmlFor="newExpiryDate">Nova Data de Validade</Label>
+                        <Input id="newExpiryDate" name="newExpiryDate" type="date" defaultValue={format(new Date(product.expiryDate), 'yyyy-MM-dd')} />
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="newBatchNumber">Novo Lote</Label>
+                        <Input id="newBatchNumber" name="newBatchNumber" placeholder="Lote do novo produto" defaultValue={product.batchNumber}/>
+                    </div>
+                     <div className="space-y-2">
+                        <Label htmlFor="newCostPrice">Novo Preço de Custo (R$)</Label>
+                        <Input id="newCostPrice" name="newCostPrice" type="number" step="0.01" placeholder="0,00" defaultValue={product.costPrice} />
+                    </div>
+                </div>
+            )}
+
+            <div className="space-y-2">
                 <Label htmlFor="notes">Observações (Opcional)</Label>
-                <Textarea id="notes" name="notes" placeholder="Ex: Ajuste de inventário" />
+                <Textarea id="notes" name="notes" placeholder="Ex: Compra de emergência, ajuste de inventário" />
             </div>
             <Button type="submit" className="w-full" disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Salvar
+                Salvar Movimentação
             </Button>
         </form>
     )
 }
 
 function ProductDetailsDialog({ product }: { product: Product }) {
-    const detailItem = (label: string, value?: string | number) => {
+    const detailItem = (label: string, value?: string | number | null) => {
         if (!value && value !== 0) return null;
         return (
             <div>

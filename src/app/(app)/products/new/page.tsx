@@ -112,6 +112,7 @@ export default function NewProductPage() {
         supplier: data.supplier || '',
         costPrice: data.costPrice || 0,
         notes: data.notes || '',
+        barcode: data.barcode || '',
       };
       
       const batch = writeBatch(db);
@@ -130,6 +131,10 @@ export default function NewProductPage() {
               previousStock: 0,
               newStock: data.currentStock,
               notes: 'Estoque inicial ao cadastrar o produto.',
+              professionalName: user.displayName || 'Sistema',
+              newBatchNumber: data.batchNumber,
+              newExpiryDate: data.expiryDate,
+              newCostPrice: data.costPrice,
           };
           batch.set(movementRef, movementData);
       }
