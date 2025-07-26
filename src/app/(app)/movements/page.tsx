@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import useAuth from '@/hooks/useAuth';
-import { unparse } from 'papaparse';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -164,7 +163,8 @@ export default function MovementsPage() {
         });
     }, [movements, searchTerm, activeFilter]);
 
-    const handleExportCSV = () => {
+    const handleExportCSV = async () => {
+        const { unparse } = await import('papaparse');
         const dataToExport = filteredMovements.map(m => ({
             "Data": new Date(m.date).toLocaleString('pt-BR'),
             "Produto": m.productName,
@@ -181,7 +181,7 @@ export default function MovementsPage() {
         }));
 
         const csv = unparse(dataToExport);
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         if (link.href) {
             URL.revokeObjectURL(link.href);
@@ -287,3 +287,5 @@ export default function MovementsPage() {
         </div>
     );
 }
+
+    
