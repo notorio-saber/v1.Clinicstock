@@ -1,17 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { Product } from '@/lib/types';
+import type { Product, StockMovement } from '@/lib/types';
 import { differenceInDays, parseISO } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, Edit, PackagePlus, Trash2, XCircle, Loader2 } from 'lucide-react';
+import { PackagePlus, Trash2, XCircle, Loader2, AlertTriangle, Save } from 'lucide-react';
 import Image from 'next/image';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import useAuth from '@/hooks/useAuth';
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, writeBatch, doc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+
 
 type AlertType = 'expired' | 'expiring_7' | 'expiring_30' | 'low_stock';
 
@@ -22,7 +29,138 @@ const alertConfig = {
     low_stock: { title: 'Estoque Baixo', icon: AlertTriangle, color: 'text-orange-500' },
 };
 
+function MovementForm({ product, onFinished }: { product: Product, onFinished: () => void }) {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [isSaving, setIsSaving] = useState(false);
+
+    const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+        if (!user) return;
+
+        const formData = new FormData(event.currentTarget);
+        const quantity = parseInt(formData.get('quantity') as string, 10);
+        const notes = formData.get('notes') as string;
+
+        if (isNaN(quantity) || quantity <= 0) {
+            toast({ variant: 'destructive', title: 'Erro', description: 'A quantidade deve ser um número positivo.' });
+            return;
+        }
+
+        setIsSaving(true);
+        try {
+            const batch = writeBatch(db);
+            const productDocRef = doc(db, `users/${user.uid}/products`, product.id);
+            
+            const previousStock = product.currentStock;
+            const newStock = previousStock + quantity;
+
+            batch.update(productDocRef, { currentStock: newStock });
+
+            const movementCollectionRef = collection(db, `users/${user.uid}/movements`);
+            const newMovementRef = doc(movementCollectionRef);
+            const movementData: Omit<StockMovement, 'id'> = {
+                productId: product.id,
+                productName: product.name,
+                type: 'entrada',
+                quantity,
+                reason: 'Entrada Manual',
+                date: new Date().toISOString(),
+                previousStock,
+                newStock,
+                notes,
+            };
+            batch.set(newMovementRef, movementData);
+            
+            await batch.commit();
+
+            toast({
+                title: 'Sucesso!',
+                description: 'Movimentação de entrada registrada.',
+                className: 'bg-green-500 text-white',
+            });
+            onFinished();
+
+        } catch (error) {
+            console.error("Erro ao registrar movimentação: ", error);
+            toast({ variant: 'destructive', title: 'Erro na Transação', description: "Não foi possível registrar a movimentação." });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    return (
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+             <SheetHeader className='text-left'>
+                <SheetTitle>Registrar Entrada: {product.name}</SheetTitle>
+                <SheetDescription>Adicione novas unidades ao estoque deste produto.</SheetDescription>
+            </SheetHeader>
+            <div className="space-y-2">
+                <Label htmlFor="quantity">Quantidade</Label>
+                <Input id="quantity" name="quantity" type="number" placeholder="0" required min="1"/>
+            </div>
+            <div className="space-y-2">
+                <Label htmlFor="notes">Observações (Opcional)</Label>
+                <Textarea id="notes" name="notes" placeholder="Ex: Compra de emergência" />
+            </div>
+            <Button type="submit" className="w-full" disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Salvar Entrada
+            </Button>
+        </form>
+    )
+}
+
+
 function AlertCard({ product }: { product: Product }) {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [isSaving, setIsSaving] = useState(false);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+    const handleDiscard = async () => {
+        if (!user || !product) return;
+
+        setIsSaving(true);
+        try {
+            const batch = writeBatch(db);
+            const productDocRef = doc(db, `users/${user.uid}/products`, product.id);
+            const previousStock = product.currentStock;
+
+            batch.update(productDocRef, { currentStock: 0 });
+
+            if (previousStock > 0) {
+                 const movementRef = doc(collection(db, `users/${user.uid}/movements`));
+                 const movementData: Omit<StockMovement, 'id'> = {
+                     productId: product.id,
+                     productName: product.name,
+                     type: 'saida',
+                     quantity: previousStock,
+                     reason: 'Vencimento',
+                     date: new Date().toISOString(),
+                     previousStock,
+                     newStock: 0,
+                     notes: 'Produto descartado por vencimento ou alerta.',
+                 };
+                 batch.set(movementRef, movementData);
+            }
+
+            await batch.commit();
+
+            toast({
+                title: 'Sucesso!',
+                description: 'Produto descartado e estoque zerado.',
+                className: 'bg-green-500 text-white',
+            });
+
+        } catch (error) {
+            console.error("Erro ao descartar produto: ", error);
+            toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível descartar o produto.' });
+        } finally {
+            setIsSaving(false);
+        }
+    }
+
     return (
         <Card className="mb-3">
             <CardContent className="p-3">
@@ -36,9 +174,38 @@ function AlertCard({ product }: { product: Product }) {
                     </div>
                 </div>
                 <div className="mt-2 flex flex-wrap justify-end gap-2">
-                    <Button variant="outline" size="sm"><Edit className="mr-1 h-3 w-3"/> Editar</Button>
-                    <Button variant="outline" size="sm"><PackagePlus className="mr-1 h-3 w-3"/> Entrada</Button>
-                    <Button variant="destructive" size="sm"><Trash2 className="mr-1 h-3 w-3"/> Descartar</Button>
+                    <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+                        <SheetTrigger asChild>
+                           <Button variant="outline" size="sm"><PackagePlus className="mr-1 h-3 w-3"/> Entrada</Button>
+                        </SheetTrigger>
+                        <SheetContent>
+                            <MovementForm product={product} onFinished={() => setIsSheetOpen(false)} />
+                        </SheetContent>
+                    </Sheet>
+
+                    <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive" size="sm" disabled={product.currentStock === 0}>
+                                <Trash2 className="mr-1 h-3 w-3"/> Descartar
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Descartar todo o estoque?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Esta ação zerará o estoque de <span className="font-semibold">{product.name}</span> (quantidade: {product.currentStock}). 
+                                    A movimentação será registrada como "Vencimento".
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleDiscard} disabled={isSaving}>
+                                    {isSaving ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : null}
+                                    Confirmar Descarte
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                 </div>
             </CardContent>
         </Card>
@@ -79,20 +246,37 @@ export default function AlertsPage() {
             low_stock: [],
         };
 
+        const uniqueProducts = new Map<string, Product>();
+
         products.forEach(p => {
-            const daysToExpiry = differenceInDays(parseISO(p.expiryDate), new Date());
-            if (daysToExpiry < 0) {
-                alerts.expired.push(p);
-            } else if (daysToExpiry <= 7) {
-                alerts.expiring_7.push(p);
-            } else if (daysToExpiry <= 30) {
-                alerts.expiring_30.push(p);
-            }
+             const daysToExpiry = differenceInDays(parseISO(p.expiryDate), new Date());
+             let hasAlert = false;
 
             if (p.currentStock <= p.minimumStock && p.currentStock > 0) {
+                if(!uniqueProducts.has(p.id)) uniqueProducts.set(p.id, p);
                 alerts.low_stock.push(p);
+                hasAlert = true;
+            }
+            if (daysToExpiry < 0) {
+                 if(!uniqueProducts.has(p.id)) uniqueProducts.set(p.id, p);
+                alerts.expired.push(p);
+                hasAlert = true;
+            } else if (daysToExpiry <= 7) {
+                 if(!uniqueProducts.has(p.id)) uniqueProducts.set(p.id, p);
+                alerts.expiring_7.push(p);
+                hasAlert = true;
+            } else if (daysToExpiry <= 30) {
+                 if(!uniqueProducts.has(p.id)) uniqueProducts.set(p.id, p);
+                alerts.expiring_30.push(p);
+                hasAlert = true;
             }
         });
+        
+        // Remove duplicates from each alert category. A product can be in low stock AND expiring.
+        alerts.expired = [...new Map(alerts.expired.map(item => [item['id'], item])).values()];
+        alerts.expiring_7 = [...new Map(alerts.expiring_7.map(item => [item['id'], item])).values()];
+        alerts.expiring_30 = [...new Map(alerts.expiring_30.map(item => [item['id'], item])).values()];
+        alerts.low_stock = [...new Map(alerts.low_stock.map(item => [item['id'], item])).values()];
 
         return alerts;
     };
@@ -124,7 +308,7 @@ export default function AlertsPage() {
                 </p>
             </div>
         ) : (
-            <Accordion type="multiple" defaultValue={['expired', 'expiring_7']} className="w-full space-y-4">
+            <Accordion type="multiple" defaultValue={alertOrder.filter(type => alerts[type].length > 0)} className="w-full space-y-4">
                 {alertOrder.map(type => {
                     const config = alertConfig[type];
                     const products = alerts[type];
