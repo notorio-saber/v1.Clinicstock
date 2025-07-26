@@ -157,7 +157,7 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
     const defaultReason = type === 'entrada' ? 'Compra' : 'Uso';
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4 p-4 max-h-[80vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
              <div className="space-y-2">
                 <Label htmlFor="quantity">Quantidade*</Label>
                 <Input id="quantity" name="quantity" type="number" placeholder="0" required min="1"/>
@@ -333,7 +333,7 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (produ
                             </DropdownMenuContent>
                         </DropdownMenu>
                         
-                        <SheetContent onOpenAutoFocus={(e) => e.preventDefault()}>
+                        <SheetContent className="flex flex-col" onOpenAutoFocus={(e) => e.preventDefault()}>
                             <SheetHeader>
                                 <SheetTitle>
                                 {sheetType === 'entrada' ? `Registrar Entrada: ${product.name}` : `Registrar Saída: ${product.name}`}
@@ -344,7 +344,9 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (produ
                                         : 'Remova unidades do estoque (por uso, venda, perda, etc).'}
                                 </SheetDescription>
                             </SheetHeader>
-                            {sheetType && <MovementForm product={product} type={sheetType} onFinished={() => setSheetType(null)} />}
+                            <div className='overflow-y-auto -mr-6 pr-6'>
+                                {sheetType && <MovementForm product={product} type={sheetType} onFinished={() => setSheetType(null)} />}
+                            </div>
                         </SheetContent>
                     </Sheet>
 
