@@ -248,7 +248,7 @@ export default function MovementsPage() {
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-start">
+             <div className="flex justify-between items-start">
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">Histórico de Movimentações</h2>
                     <p className="text-muted-foreground">Veja todas as entradas e saídas do seu estoque.</p>
@@ -259,8 +259,8 @@ export default function MovementsPage() {
                 </Button>
             </div>
 
-            <div className="sticky top-[64px] z-10 bg-secondary/95 py-3 backdrop-blur-sm -mx-4 px-4 border-b">
-                 <div className="space-y-3 max-w-3xl mx-auto">
+            <div className="sticky top-16 z-10 bg-secondary/95 backdrop-blur-sm py-3 border-b">
+                <div className="space-y-3">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                         <Input 
