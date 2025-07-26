@@ -246,27 +246,27 @@ export default function AlertsPage() {
             low_stock: [],
         };
 
-        const uniqueProducts = new Map<string, Product>();
+        if (products.length === 0) {
+            return alerts;
+        }
 
         products.forEach(p => {
+             if (p.currentStock === 0) return; // Ignorar produtos com estoque zerado
+
              const daysToExpiry = differenceInDays(parseISO(p.expiryDate), new Date());
              let hasAlert = false;
 
-            if (p.currentStock <= p.minimumStock && p.currentStock > 0) {
-                if(!uniqueProducts.has(p.id)) uniqueProducts.set(p.id, p);
+            if (p.currentStock <= p.minimumStock) {
                 alerts.low_stock.push(p);
                 hasAlert = true;
             }
             if (daysToExpiry < 0) {
-                 if(!uniqueProducts.has(p.id)) uniqueProducts.set(p.id, p);
                 alerts.expired.push(p);
                 hasAlert = true;
             } else if (daysToExpiry <= 7) {
-                 if(!uniqueProducts.has(p.id)) uniqueProducts.set(p.id, p);
                 alerts.expiring_7.push(p);
                 hasAlert = true;
             } else if (daysToExpiry <= 30) {
-                 if(!uniqueProducts.has(p.id)) uniqueProducts.set(p.id, p);
                 alerts.expiring_30.push(p);
                 hasAlert = true;
             }
@@ -283,7 +283,7 @@ export default function AlertsPage() {
     
     const alerts = getAlerts();
     const alertOrder: AlertType[] = ['expired', 'expiring_7', 'expiring_30', 'low_stock'];
-    const totalAlerts = alertOrder.reduce((sum, type) => sum + alerts[type].length, 0);
+    const totalAlerts = alertOrder.reduce((sum, type) => sum + (alerts[type]?.length || 0), 0);
 
   return (
     <div className="space-y-4">
@@ -308,11 +308,11 @@ export default function AlertsPage() {
                 </p>
             </div>
         ) : (
-            <Accordion type="multiple" defaultValue={alertOrder.filter(type => alerts[type].length > 0)} className="w-full space-y-4">
+            <Accordion type="multiple" defaultValue={alertOrder.filter(type => alerts[type]?.length > 0)} className="w-full space-y-4">
                 {alertOrder.map(type => {
                     const config = alertConfig[type];
                     const products = alerts[type];
-                    if (products.length === 0) return null;
+                    if (!products || products.length === 0) return null;
 
                     return (
                         <AccordionItem key={type} value={type} className="border rounded-lg bg-card overflow-hidden">

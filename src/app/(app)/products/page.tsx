@@ -49,9 +49,10 @@ import { deleteObject, ref } from 'firebase/storage';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 const getStatus = (product: Product): { text: string; className: string } => {
+    if (product.currentStock === 0) return { text: 'Zerado', className: 'bg-gray-500/20 text-gray-500 border-gray-500/30' };
     const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
     if (daysToExpiry < 0) return { text: 'Vencido', className: 'bg-red-500/20 text-red-500 border-red-500/30' };
-    if (product.currentStock > 0 && product.currentStock <= product.minimumStock) return { text: 'Estoque Baixo', className: 'bg-orange-500/20 text-orange-500 border-orange-500/30' };
+    if (product.currentStock <= product.minimumStock) return { text: 'Estoque Baixo', className: 'bg-orange-500/20 text-orange-500 border-orange-500/30' };
     if (daysToExpiry <= 30) return { text: 'Vencendo', className: 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30' };
     return { text: 'Estoque OK', className: 'bg-green-500/20 text-green-500 border-green-500/30' };
 };
@@ -197,8 +198,13 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (produ
   const [sheetType, setSheetType] = useState<'entrada' | 'saida' | null>(null);
   
   let expiryColor = 'text-green-500';
-  if (daysToExpiry < 0) expiryColor = 'text-red-500';
-  else if (daysToExpiry <= 30) expiryColor = 'text-orange-500';
+  if (product.currentStock > 0) {
+    if (daysToExpiry < 0) expiryColor = 'text-red-500';
+    else if (daysToExpiry <= 30) expiryColor = 'text-orange-500';
+  } else {
+    expiryColor = 'text-muted-foreground';
+  }
+
 
   const handleDelete = async () => {
     setIsDeleting(true);
@@ -338,6 +344,7 @@ export default function ProductsPage() {
             
             if (activeFilter === 'Todos') return true;
             if (activeFilter === 'Vencendo') {
+                if (product.currentStock === 0) return false;
                 const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
                 return daysToExpiry >= 0 && daysToExpiry <= 30;
             }

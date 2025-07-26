@@ -12,37 +12,92 @@ import { ArrowDown, ArrowUp, Search, Package } from 'lucide-react';
 import type { StockMovement } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+
+function MovementDetailsDialog({ movement }: { movement: StockMovement }) {
+    const isEntry = movement.type === 'entrada';
+
+    const detailItem = (label: string, value?: string | number | null) => {
+        if (!value && value !== 0) return null;
+        return (
+            <div className="py-2">
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <p className="font-medium">{value}</p>
+            </div>
+        )
+    }
+
+    return (
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Detalhes da Movimentação</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 pt-2">
+                <div className={cn("flex items-center gap-4 p-4 rounded-lg", isEntry ? 'bg-green-500/10' : 'bg-red-500/10')}>
+                     <div className={cn("flex h-10 w-10 items-center justify-center rounded-full", isEntry ? 'bg-green-500/20' : 'bg-red-500/20')}>
+                        {isEntry ? ( <ArrowUp className="h-5 w-5 text-green-500" /> ) : ( <ArrowDown className="h-5 w-5 text-red-500" /> )}
+                    </div>
+                    <div>
+                        <p className="font-bold text-lg">{movement.productName}</p>
+                        <p className={cn("font-semibold", isEntry ? 'text-green-600' : 'text-red-600')}>
+                            {isEntry ? 'ENTRADA' : 'SAÍDA'} DE {movement.quantity} {movement.quantity > 1 ? 'UNIDADES' : 'UNIDADE'}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-x-4 divide-y">
+                    {detailItem("Data", new Date(movement.date).toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short'}))}
+                    {detailItem("Motivo", movement.reason)}
+                    {detailItem("Estoque Anterior", movement.previousStock)}
+                    {detailItem("Estoque Resultante", movement.newStock)}
+                </div>
+
+                {movement.notes && (
+                    <div className="space-y-1 pt-2">
+                        <p className="text-sm text-muted-foreground">Observações</p>
+                        <p className="text-sm rounded-md border bg-muted/50 p-3 whitespace-pre-wrap">{movement.notes}</p>
+                    </div>
+                )}
+            </div>
+        </DialogContent>
+    )
+}
 
 function MovementCard({ movement }: { movement: StockMovement }) {
     const isEntry = movement.type === 'entrada';
     return (
-        <Card>
-            <CardContent className="p-4 flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4">
-                    <div className={cn("flex h-10 w-10 items-center justify-center rounded-full", isEntry ? 'bg-green-500/20' : 'bg-red-500/20')}>
-                        {isEntry ? (
-                            <ArrowUp className="h-5 w-5 text-green-500" />
-                        ) : (
-                            <ArrowDown className="h-5 w-5 text-red-500" />
-                        )}
-                    </div>
-                    <div>
-                        <p className="font-semibold">{movement.productName}</p>
-                        <p className="text-sm text-muted-foreground">
-                            {new Date(movement.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                        </p>
-                    </div>
-                </div>
-                <div className="text-right">
-                    <p className={cn("font-bold text-lg", isEntry ? 'text-green-500' : 'text-red-500')}>
-                        {isEntry ? '+' : '-'} {movement.quantity}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                        Saldo: {movement.newStock}
-                    </p>
-                </div>
-            </CardContent>
-        </Card>
+        <Dialog>
+            <DialogTrigger asChild>
+                <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+                    <CardContent className="p-4 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <div className={cn("flex h-10 w-10 items-center justify-center rounded-full", isEntry ? 'bg-green-500/20' : 'bg-red-500/20')}>
+                                {isEntry ? (
+                                    <ArrowUp className="h-5 w-5 text-green-500" />
+                                ) : (
+                                    <ArrowDown className="h-5 w-5 text-red-500" />
+                                )}
+                            </div>
+                            <div>
+                                <p className="font-semibold">{movement.productName}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {new Date(movement.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className={cn("font-bold text-lg", isEntry ? 'text-green-500' : 'text-red-500')}>
+                                {isEntry ? '+' : '-'} {movement.quantity}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                                Saldo: {movement.newStock}
+                            </p>
+                        </div>
+                    </CardContent>
+                </Card>
+            </DialogTrigger>
+            <MovementDetailsDialog movement={movement} />
+        </Dialog>
     );
 }
 
@@ -53,7 +108,6 @@ export default function MovementsPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeFilter, setActiveFilter] = useState('Todos');
 
-    // O filtro 'Por Período' é apenas visual por enquanto
     const filters = ['Todos', 'Entradas', 'Saídas'];
 
     useEffect(() => {

@@ -77,15 +77,16 @@ export default function DashboardPage() {
 
   const totalProducts = products.length;
   const expiringSoonCount = products.filter(p => {
+    if (p.currentStock === 0) return false;
     const days = differenceInDays(parseISO(p.expiryDate), new Date());
     return days >= 0 && days <= 30;
   }).length;
-  const lowStock = products.filter(p => p.currentStock <= p.minimumStock && p.currentStock > 0).length;
+  const lowStock = products.filter(p => p.currentStock > 0 && p.currentStock <= p.minimumStock).length;
   const totalValue = products.reduce((sum, p) => sum + (p.costPrice || 0) * p.currentStock, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
   const nextExpiries = [...products]
+    .filter(p => p.currentStock > 0 && differenceInDays(parseISO(p.expiryDate), new Date()) >= 0)
     .sort((a, b) => new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime())
-    .filter(p => differenceInDays(parseISO(p.expiryDate), new Date()) >= 0)
     .slice(0, 5);
 
   const hasUrgentExpiries = nextExpiries.some(p => differenceInDays(parseISO(p.expiryDate), new Date()) <= 30);
