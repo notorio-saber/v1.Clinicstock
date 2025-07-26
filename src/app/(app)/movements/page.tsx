@@ -4,11 +4,12 @@ import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import useAuth from '@/hooks/useAuth';
+import { unparse } from 'papaparse';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { ArrowDown, ArrowUp, Search, Package } from 'lucide-react';
+import { ArrowDown, ArrowUp, Search, Package, FileDown } from 'lucide-react';
 import type { StockMovement } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -163,6 +164,36 @@ export default function MovementsPage() {
         });
     }, [movements, searchTerm, activeFilter]);
 
+    const handleExportCSV = () => {
+        const dataToExport = filteredMovements.map(m => ({
+            "Data": new Date(m.date).toLocaleString('pt-BR'),
+            "Produto": m.productName,
+            "Tipo": m.type === 'entrada' ? 'Entrada' : 'Saída',
+            "Quantidade": m.quantity,
+            "Motivo": m.reason,
+            "Profissional Responsável": m.professionalName || '',
+            "Estoque Anterior": m.previousStock,
+            "Estoque Resultante": m.newStock,
+            "Lote (Entrada)": m.newBatchNumber || '',
+            "Validade (Entrada)": m.newExpiryDate ? new Date(m.newExpiryDate).toLocaleDateString('pt-BR') : '',
+            "Custo (Entrada)": m.newCostPrice ? m.newCostPrice.toFixed(2) : '',
+            "Observações": m.notes || '',
+        }));
+
+        const csv = unparse(dataToExport);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.href) {
+            URL.revokeObjectURL(link.href);
+        }
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.setAttribute('download', `historico_movimentacoes_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const renderContent = () => {
         if (loading) {
             return (
@@ -217,9 +248,15 @@ export default function MovementsPage() {
 
     return (
         <div className="space-y-4">
-            <div>
-                <h2 className="text-2xl font-bold tracking-tight">Histórico de Movimentações</h2>
-                <p className="text-muted-foreground">Veja todas as entradas e saídas do seu estoque.</p>
+            <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold tracking-tight">Histórico de Movimentações</h2>
+                    <p className="text-muted-foreground">Veja todas as entradas e saídas do seu estoque.</p>
+                </div>
+                 <Button variant="outline" onClick={handleExportCSV} disabled={filteredMovements.length === 0}>
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Exportar CSV
+                </Button>
             </div>
 
             <div className="sticky top-16 bg-secondary/80 backdrop-blur-sm z-10 -mx-4 -mt-4 px-4 py-3">
