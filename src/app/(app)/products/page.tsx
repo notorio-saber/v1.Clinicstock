@@ -9,7 +9,7 @@ import Image from 'next/image';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, MoreVertical, Edit, ArrowUp, ArrowDown, Package, Trash2, Loader2, Save } from 'lucide-react';
+import { Search, MoreVertical, Edit, ArrowUp, ArrowDown, Package, Trash2, Loader2, Save, Eye } from 'lucide-react';
 import type { Product, StockMovement } from '@/lib/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +46,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { deleteObject, ref } from 'firebase/storage';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 const getStatus = (product: Product): { text: string; className: string } => {
     const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
@@ -140,6 +141,55 @@ function MovementForm({ product, type, onFinished }: { product: Product, type: '
     )
 }
 
+function ProductDetailsDialog({ product }: { product: Product }) {
+    const detailItem = (label: string, value?: string | number) => {
+        if (!value && value !== 0) return null;
+        return (
+            <div>
+                <p className="text-sm text-muted-foreground">{label}</p>
+                <p className="font-medium">{value}</p>
+            </div>
+        )
+    }
+
+    return (
+        <DialogContent className="max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+                <DialogTitle>Detalhes do Produto</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 pt-4">
+                <div className="flex items-center gap-4">
+                    <div className="relative h-20 w-20 flex-shrink-0 rounded-md overflow-hidden bg-muted">
+                        {product.photoURL && <Image src={product.photoURL} alt={product.name} fill className="object-cover" data-ai-hint={product['data-ai-hint']} />}
+                    </div>
+                    <div>
+                        <h3 className="text-xl font-bold">{product.name}</h3>
+                        <p className="text-muted-foreground">{product.category}</p>
+                    </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                    {detailItem("Estoque Atual", product.currentStock)}
+                    {detailItem("Estoque Mínimo", product.minimumStock)}
+                    {detailItem("Unidade", product.unit)}
+                    {detailItem("Data de Validade", new Date(product.expiryDate).toLocaleDateString('pt-BR'))}
+                    {detailItem("Lote", product.batchNumber)}
+                    {detailItem("Fornecedor", product.supplier)}
+                    {detailItem("Preço de Custo", product.costPrice > 0 ? `R$ ${product.costPrice.toFixed(2)}` : undefined)}
+                    {detailItem("Cód. Barras", product.barcode)}
+                </div>
+
+                {product.notes && (
+                    <div className="space-y-1">
+                        <p className="text-sm text-muted-foreground">Observações</p>
+                        <p className="text-sm rounded-md border bg-muted/50 p-3">{product.notes}</p>
+                    </div>
+                )}
+            </div>
+        </DialogContent>
+    );
+}
+
 function ProductCard({ product, onDelete }: { product: Product, onDelete: (product: Product) => Promise<void> }) {
   const status = getStatus(product);
   const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
@@ -156,87 +206,94 @@ function ProductCard({ product, onDelete }: { product: Product, onDelete: (produ
   };
 
   return (
-    <Card>
-      <CardContent className="p-3 flex items-start gap-4">
-        <div className="relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden bg-muted">
-            {product.photoURL && <Image src={product.photoURL} alt={product.name} fill className="object-cover" data-ai-hint={product['data-ai-hint']} />}
-        </div>
-        
-        <div className="flex-1 space-y-1 min-w-0">
-            <div className='flex justify-between items-start gap-2'>
-                 <h3 className="font-semibold leading-tight flex-1 truncate">{product.name}</h3>
-                 <Badge variant="outline" className={cn("text-xs whitespace-nowrap flex-shrink-0", status.className)}>{status.text}</Badge>
-            </div>
-             <p className="text-sm text-muted-foreground truncate">{product.category}</p>
-          
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground pt-2">
-                <span>Estoque: <span className="font-medium text-foreground">{product.currentStock} / min: {product.minimumStock}</span></span>
-                <span className={expiryColor}>
-                Val: {new Date(product.expiryDate).toLocaleDateString('pt-BR')}
-                </span>
-            </div>
-        </div>
-
-        <AlertDialog>
-            <Sheet open={!!sheetType} onOpenChange={(isOpen) => !isOpen && setSheetType(null)}>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className='-mr-2 -mt-1 h-8 w-8 flex-shrink-0'>
-                            <MoreVertical className="h-5 w-5" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                            <Link href={`/products/${product.id}/edit`}><Edit className="mr-2 h-4 w-4"/>Editar</Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setSheetType('entrada')}>
-                            <ArrowUp className="mr-2 h-4 w-4 text-green-500"/>Registrar Entrada
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setSheetType('saida')}>
-                            <ArrowDown className="mr-2 h-4 w-4 text-red-500"/>Registrar Saída
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <AlertDialogTrigger asChild>
-                           <DropdownMenuItem className="text-red-500 focus:text-red-500 focus:bg-red-500/10">
-                             <Trash2 className="mr-2 h-4 w-4"/>Excluir
-                           </DropdownMenuItem>
-                        </AlertDialogTrigger>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+    <Dialog>
+        <Card>
+            <CardContent className="p-3 flex items-start gap-4">
+                <div className="relative h-16 w-16 flex-shrink-0 rounded-md overflow-hidden bg-muted">
+                    {product.photoURL && <Image src={product.photoURL} alt={product.name} fill className="object-cover" data-ai-hint={product['data-ai-hint']} />}
+                </div>
                 
-                <SheetContent onOpenAutoFocus={(e) => e.preventDefault()}>
-                    <SheetHeader>
-                        <SheetTitle>
-                          {sheetType === 'entrada' ? `Registrar Entrada: ${product.name}` : `Registrar Saída: ${product.name}`}
-                        </SheetTitle>
-                         <SheetDescription>
-                            {sheetType === 'entrada' 
-                                ? 'Adicione novas unidades ao estoque deste produto.' 
-                                : 'Remova unidades do estoque (por uso, venda, perda, etc).'}
-                        </SheetDescription>
-                    </SheetHeader>
-                     {sheetType && <MovementForm product={product} type={sheetType} onFinished={() => setSheetType(null)} />}
-                </SheetContent>
-            </Sheet>
+                <div className="flex-1 space-y-1 min-w-0">
+                    <div className='flex justify-between items-start gap-2'>
+                        <h3 className="font-semibold leading-tight flex-1 truncate">{product.name}</h3>
+                        <Badge variant="outline" className={cn("text-xs whitespace-nowrap flex-shrink-0", status.className)}>{status.text}</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground truncate">{product.category}</p>
+                
+                    <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm text-muted-foreground pt-2">
+                        <span>Estoque: <span className="font-medium text-foreground">{product.currentStock} / min: {product.minimumStock}</span></span>
+                        <span className={expiryColor}>
+                        Val: {new Date(product.expiryDate).toLocaleDateString('pt-BR')}
+                        </span>
+                    </div>
+                </div>
 
-             <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto <span className="font-semibold">{product.name}</span> e todo o seu histórico de movimentações.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Sim, excluir
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-        </AlertDialog>
-      </CardContent>
-    </Card>
+                <AlertDialog>
+                    <Sheet open={!!sheetType} onOpenChange={(isOpen) => !isOpen && setSheetType(null)}>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className='-mr-2 -mt-1 h-8 w-8 flex-shrink-0'>
+                                    <MoreVertical className="h-5 w-5" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DialogTrigger asChild>
+                                    <DropdownMenuItem><Eye className="mr-2 h-4 w-4"/>Ver Detalhes</DropdownMenuItem>
+                                </DialogTrigger>
+                                <DropdownMenuItem asChild>
+                                    <Link href={`/products/${product.id}/edit`}><Edit className="mr-2 h-4 w-4"/>Editar</Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onSelect={() => setSheetType('entrada')}>
+                                    <ArrowUp className="mr-2 h-4 w-4 text-green-500"/>Registrar Entrada
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => setSheetType('saida')}>
+                                    <ArrowDown className="mr-2 h-4 w-4 text-red-500"/>Registrar Saída
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <AlertDialogTrigger asChild>
+                                <DropdownMenuItem className="text-red-500 focus:text-red-500 focus:bg-red-500/10">
+                                    <Trash2 className="mr-2 h-4 w-4"/>Excluir
+                                </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        
+                        <SheetContent onOpenAutoFocus={(e) => e.preventDefault()}>
+                            <SheetHeader>
+                                <SheetTitle>
+                                {sheetType === 'entrada' ? `Registrar Entrada: ${product.name}` : `Registrar Saída: ${product.name}`}
+                                </SheetTitle>
+                                <SheetDescription>
+                                    {sheetType === 'entrada' 
+                                        ? 'Adicione novas unidades ao estoque deste produto.' 
+                                        : 'Remova unidades do estoque (por uso, venda, perda, etc).'}
+                                </SheetDescription>
+                            </SheetHeader>
+                            {sheetType && <MovementForm product={product} type={sheetType} onFinished={() => setSheetType(null)} />}
+                        </SheetContent>
+                    </Sheet>
+
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                        <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Esta ação não pode ser desfeita. Isso excluirá permanentemente o produto <span className="font-semibold">{product.name}</span> e todo o seu histórico de movimentações.
+                        </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+                            {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Sim, excluir
+                        </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+            </CardContent>
+        </Card>
+        <ProductDetailsDialog product={product} />
+    </Dialog>
   )
 }
 
