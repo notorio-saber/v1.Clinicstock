@@ -3,17 +3,43 @@
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, Shield, LogOut, Loader2, Upload } from 'lucide-react';
+import { Save, Shield, LogOut, Loader2, Upload, Bell, BellOff } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
 import { signOut, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
-import { auth, storage } from '@/lib/firebase';
+import { auth, storage, messaging, db } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getToken } from 'firebase/messaging';
+import { doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
+
+async function requestNotificationPermission(userId: string) {
+    if (!messaging) {
+        console.error("Firebase Messaging is not initialized.");
+        throw new Error("Messaging not supported.");
+    }
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+        const vapidKey = "YOUR_VAPID_KEY_HERE"; // You need to generate this in Firebase Console > Project Settings > Cloud Messaging > Web configuration
+        const fcmToken = await getToken(messaging, { vapidKey: "BAlbC8hG3s_44z-J3e-a-UvI4Ua-6zJzIeG2bO9n1gH8f_qG_d3Q3eK9C9s4c3Y6K0b5j3v2n4J8_rR7_z_z_w" });
+        if (fcmToken) {
+            console.log('FCM Token:', fcmToken);
+            const tokenRef = doc(db, `users/${userId}/fcmTokens`, fcmToken);
+            await setDoc(tokenRef, { token: fcmToken, createdAt: new Date() });
+            return true;
+        } else {
+           console.log('No registration token available. Request permission to generate one.');
+           throw new Error("Não foi possível obter o token de notificação.");
+        }
+    } else {
+        console.log('Unable to get permission to notify.');
+        throw new Error("Permissão para notificações não foi concedida.");
+    }
+}
 
 export default function ProfilePage() {
   const { user, loading: authLoading, reloadUser } = useAuth();
@@ -24,6 +50,7 @@ export default function ProfilePage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [notificationStatus, setNotificationStatus] = useState<'default' | 'granted' | 'denied'>('default');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isPasswordProvider = user?.providerData.some(p => p.providerId === 'password');
@@ -32,6 +59,7 @@ export default function ProfilePage() {
     if (user) {
       setDisplayName(user.displayName || '');
       setImagePreview(user.photoURL);
+      setNotificationStatus(Notification.permission);
     }
   }, [user]);
 
@@ -72,14 +100,12 @@ export default function ProfilePage() {
       try {
           let photoURL = user.photoURL;
 
-          // Step 1: Upload new image if it exists
           if (hasNewImage && imageFile) {
               const imageRef = ref(storage, `users/${user.uid}/profile-picture`);
               await uploadBytes(imageRef, imageFile);
               photoURL = await getDownloadURL(imageRef);
           }
 
-          // Step 2: Update Firebase Auth profile
           if (auth.currentUser) {
             await updateProfile(auth.currentUser, {
                 displayName: displayName,
@@ -87,12 +113,10 @@ export default function ProfilePage() {
             });
           }
 
-
-          // Step 3: Force a reload of user data in the app
           await reloadUser();
           
           toast({ title: 'Sucesso!', description: 'Perfil atualizado.', className: 'bg-green-500 text-white' });
-          setImageFile(null); // Reset file input after successful save
+          setImageFile(null);
           
       } catch (error) {
           console.error("Error updating profile: ", error);
@@ -118,6 +142,18 @@ export default function ProfilePage() {
         toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível enviar o e-mail de redefinição de senha.' });
     }
   };
+
+  const handleNotificationRequest = async () => {
+    if (!user) return;
+    try {
+        await requestNotificationPermission(user.uid);
+        setNotificationStatus(Notification.permission);
+        toast({ title: 'Sucesso!', description: 'Notificações ativadas para este navegador.', className: 'bg-green-500 text-white' });
+    } catch (error: any) {
+        setNotificationStatus(Notification.permission);
+        toast({ variant: 'destructive', title: 'Erro ao ativar notificações', description: error.message });
+    }
+  }
 
   if (authLoading || !user) {
       return (
@@ -194,19 +230,34 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {isPasswordProvider && (
-        <Card>
+      <Card>
           <CardHeader>
             <CardTitle>Configurações</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1">
-            <Button variant="ghost" className="w-full justify-start p-4" onClick={handlePasswordReset}>
-              <Shield className="mr-3 h-5 w-5" />
-              Segurança e Senha
-            </Button>
+          <CardContent className="space-y-4">
+            {isPasswordProvider && (
+              <Button variant="ghost" className="w-full justify-start p-4 -ml-4" onClick={handlePasswordReset}>
+                  <Shield className="mr-3 h-5 w-5" />
+                  Segurança e Senha
+              </Button>
+            )}
+
+            {notificationStatus !== 'granted' ? (
+                <Button variant="default" className="w-full justify-center" onClick={handleNotificationRequest}>
+                    <Bell className="mr-3 h-5 w-5" />
+                    Ativar Notificações
+                </Button>
+            ) : (
+                <div className="text-sm text-green-500 flex items-center justify-center p-3 bg-green-500/10 rounded-md">
+                    <Bell className="mr-2 h-5 w-5" />
+                    <span>As notificações já estão ativadas neste navegador.</span>
+                </div>
+            )}
+             <CardDescription className="text-xs text-center pt-2">
+                Receba alertas de estoque baixo e produtos vencendo diretamente no seu dispositivo.
+            </CardDescription>
           </CardContent>
         </Card>
-      )}
 
        <Card>
          <CardContent className="p-3">
