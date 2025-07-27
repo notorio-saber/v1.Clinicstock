@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, Shield, LogOut, Loader2, Upload, Bell, BellOff } from 'lucide-react';
+import { Save, Shield, LogOut, Loader2, Upload, Bell, BellOff, Send } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
 import { signOut, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, storage, messaging, db } from '@/lib/firebase';
@@ -14,8 +14,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getToken } from 'firebase/messaging';
+import { getToken, deleteToken } from 'firebase/messaging';
 import { doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { sendStockAlerts } from '@/ai/flows/send-alerts-flow';
 
 async function requestNotificationPermission(userId: string) {
     if (!messaging) {
@@ -24,8 +25,8 @@ async function requestNotificationPermission(userId: string) {
     }
     const permission = await Notification.requestPermission();
     if (permission === 'granted') {
-        const vapidKey = "YOUR_VAPID_KEY_HERE"; // You need to generate this in Firebase Console > Project Settings > Cloud Messaging > Web configuration
-        const fcmToken = await getToken(messaging, { vapidKey: "BAlbC8hG3s_44z-J3e-a-UvI4Ua-6zJzIeG2bO9n1gH8f_qG_d3Q3eK9C9s4c3Y6K0b5j3v2n4J8_rR7_z_z_w" });
+        const vapidKey = "BAlbC8hG3s_44z-J3e-a-UvI4Ua-6zJzIeG2bO9n1gH8f_qG_d3Q3eK9C9s4c3Y6K0b5j3v2n4J8_rR7_z_z_w"; // Use the VAPID key from firebase.ts
+        const fcmToken = await getToken(messaging, { vapidKey });
         if (fcmToken) {
             console.log('FCM Token:', fcmToken);
             const tokenRef = doc(db, `users/${userId}/fcmTokens`, fcmToken);
@@ -41,6 +42,21 @@ async function requestNotificationPermission(userId: string) {
     }
 }
 
+async function revokeNotificationPermission(userId: string) {
+    if (!messaging) {
+        console.error("Firebase Messaging is not initialized.");
+        throw new Error("Messaging not supported.");
+    }
+    const vapidKey = "BAlbC8hG3s_44z-J3e-a-UvI4Ua-6zJzIeG2bO9n1gH8f_qG_d3Q3eK9C9s4c3Y6K0b5j3v2n4J8_rR7_z_z_w";
+    const currentToken = await getToken(messaging, { vapidKey });
+    if (currentToken) {
+        await deleteToken(messaging);
+        const tokenRef = doc(db, `users/${userId}/fcmTokens`, currentToken);
+        await deleteDoc(tokenRef);
+    }
+}
+
+
 export default function ProfilePage() {
   const { user, loading: authLoading, reloadUser } = useAuth();
   const { toast } = useToast();
@@ -51,6 +67,7 @@ export default function ProfilePage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [notificationStatus, setNotificationStatus] = useState<'default' | 'granted' | 'denied'>('default');
+  const [isSendingTest, setIsSendingTest] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isPasswordProvider = user?.providerData.some(p => p.providerId === 'password');
@@ -59,7 +76,9 @@ export default function ProfilePage() {
     if (user) {
       setDisplayName(user.displayName || '');
       setImagePreview(user.photoURL);
-      setNotificationStatus(Notification.permission);
+      if (typeof window !== 'undefined' && window.Notification) {
+        setNotificationStatus(Notification.permission);
+      }
     }
   }, [user]);
 
@@ -143,16 +162,45 @@ export default function ProfilePage() {
     }
   };
 
-  const handleNotificationRequest = async () => {
+  const handleNotificationToggle = async () => {
     if (!user) return;
     try {
-        await requestNotificationPermission(user.uid);
+        if (notificationStatus !== 'granted') {
+            await requestNotificationPermission(user.uid);
+            toast({ title: 'Sucesso!', description: 'Notificações ativadas para este navegador.', className: 'bg-green-500 text-white' });
+        } else {
+            await revokeNotificationPermission(user.uid);
+            toast({ title: 'Sucesso!', description: 'Notificações desativadas para este navegador.' });
+        }
         setNotificationStatus(Notification.permission);
-        toast({ title: 'Sucesso!', description: 'Notificações ativadas para este navegador.', className: 'bg-green-500 text-white' });
     } catch (error: any) {
         setNotificationStatus(Notification.permission);
-        toast({ variant: 'destructive', title: 'Erro ao ativar notificações', description: error.message });
+        toast({ variant: 'destructive', title: 'Erro nas Notificações', description: error.message });
     }
+  }
+
+  const handleSendTestNotification = async () => {
+      if (!user) return;
+      setIsSendingTest(true);
+      try {
+          const result = await sendStockAlerts({ userId: user.uid });
+          if (result.success) {
+            if(result.alertsFound > 0 && result.notificationsSent > 0) {
+                 toast({ title: 'Notificação de Teste Enviada!', description: `A notificação com ${result.alertsFound} alerta(s) foi enviada.`, className: 'bg-green-500 text-white' });
+            } else if (result.alertsFound > 0) {
+                 toast({ title: 'Nenhum Dispositivo Encontrado', description: 'Há alertas, mas nenhum dispositivo com notificação ativa foi encontrado.', variant: 'destructive' });
+            }
+            else {
+                 toast({ title: 'Nenhum Alerta', description: 'Seu estoque está em dia! Nenhuma notificação foi enviada.' });
+            }
+          } else {
+              throw new Error(result.message);
+          }
+      } catch (error: any) {
+         toast({ variant: 'destructive', title: 'Erro ao Enviar Teste', description: error.message });
+      } finally {
+         setIsSendingTest(false);
+      }
   }
 
   if (authLoading || !user) {
@@ -242,20 +290,21 @@ export default function ProfilePage() {
               </Button>
             )}
 
-            {notificationStatus !== 'granted' ? (
-                <Button variant="default" className="w-full justify-center" onClick={handleNotificationRequest}>
-                    <Bell className="mr-3 h-5 w-5" />
-                    Ativar Notificações
-                </Button>
-            ) : (
-                <div className="text-sm text-green-500 flex items-center justify-center p-3 bg-green-500/10 rounded-md">
-                    <Bell className="mr-2 h-5 w-5" />
-                    <span>As notificações já estão ativadas neste navegador.</span>
-                </div>
-            )}
-             <CardDescription className="text-xs text-center pt-2">
+            <Button variant={notificationStatus === 'granted' ? "secondary" : "default"} className="w-full justify-center" onClick={handleNotificationToggle}>
+                {notificationStatus === 'granted' ? <BellOff className="mr-3 h-5 w-5" /> : <Bell className="mr-3 h-5 w-5" />}
+                {notificationStatus === 'granted' ? 'Desativar Notificações' : 'Ativar Notificações'}
+            </Button>
+            <CardDescription className="text-xs text-center pt-2">
                 Receba alertas de estoque baixo e produtos vencendo diretamente no seu dispositivo.
             </CardDescription>
+
+            {notificationStatus === 'granted' && (
+                 <Button variant="outline" className="w-full" onClick={handleSendTestNotification} disabled={isSendingTest}>
+                    {isSendingTest ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Send className="mr-2 h-4 w-4"/>}
+                    Enviar Notificação de Teste
+                </Button>
+            )}
+
           </CardContent>
         </Card>
 
