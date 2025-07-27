@@ -130,7 +130,9 @@ export default function DashboardPage() {
                   return(
                   <li key={product.id} className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <Image src={product.photoURL} alt={product.name} width={40} height={40} className="rounded-full object-cover" data-ai-hint={product['data-ai-hint']}/>
+                      <div className="relative h-10 w-10 rounded-full overflow-hidden">
+                        <Image src={product.photoURL} alt={product.name} fill className="object-cover" data-ai-hint={product['data-ai-hint']}/>
+                      </div>
                       <div>
                         <p className="font-semibold">{product.name}</p>
                         <p className="text-sm text-muted-foreground">{product.category}</p>
