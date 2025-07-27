@@ -12,23 +12,21 @@ import { differenceInDays, parseISO } from 'date-fns';
 import type { Product } from '@/lib/types';
 
 
-// Initialize Firebase Admin SDK
-// IMPORTANT: This requires service account credentials.
-// In a real environment (like Firebase App Hosting), these should be set as environment variables.
-// GOOGLE_APPLICATION_CREDENTIALS points to the JSON file with the service account key.
-if (!admin.apps.length) {
-  try {
-    admin.initializeApp({
-      credential: admin.credential.applicationDefault(),
-      databaseURL: `https://${process.env.GCLOUD_PROJECT}.firebaseio.com`,
-    });
-  } catch (e) {
-    console.error('Firebase Admin initialization error', e);
-  }
+// Helper function to initialize admin app safely
+function initializeFirebaseAdmin() {
+    if (!admin.apps.length) {
+      try {
+        admin.initializeApp({
+          credential: admin.credential.applicationDefault(),
+          databaseURL: `https://${process.env.GCLOUD_PROJECT}.firebaseio.com`,
+        });
+      } catch (e) {
+        console.error('Firebase Admin initialization error', e);
+      }
+    }
+    return admin;
 }
 
-const db = admin.firestore();
-const messaging = admin.messaging();
 
 export const sendStockAlerts = ai.defineFlow(
   {
@@ -43,7 +41,11 @@ export const sendStockAlerts = ai.defineFlow(
     }),
   },
   async ({ userId }) => {
-    if (!admin.apps.length) {
+    const adminApp = initializeFirebaseAdmin();
+    const db = adminApp.firestore();
+    const messaging = adminApp.messaging();
+
+    if (!adminApp.apps.length) {
       return { success: false, message: 'Firebase Admin not initialized.', alertsFound: 0, tokensFound: 0, notificationsSent: 0 };
     }
 
@@ -61,7 +63,13 @@ export const sendStockAlerts = ai.defineFlow(
         const product = doc.data() as Product;
         if (product.currentStock === 0) return;
 
+        // Ensure expiryDate is a valid string before parsing
+        if (typeof product.expiryDate !== 'string' || !product.expiryDate) {
+            return;
+        }
+        
         const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
+        
         if (daysToExpiry >= 0 && daysToExpiry <= 7) {
           expiringSoon.push(product.name);
         }
