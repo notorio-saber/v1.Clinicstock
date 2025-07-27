@@ -26,6 +26,13 @@ const config: NextConfig = {
       'https://*.firebase.studio',
     ],
   },
+  webpack: (config, { isServer }) => {
+    // Adicionado para resolver o erro "Module not found: Can't resolve 'firebase-admin'"
+    if (!isServer) {
+        config.externals.push('firebase-admin');
+    }
+    return config;
+  }
 };
 
 export default config;
