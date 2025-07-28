@@ -11,15 +11,13 @@ import type * as admin from 'firebase-admin';
 // This ensures it's initialized only once.
 let adminApp: admin.app.App;
 function initializeFirebaseAdmin() {
-    if (!admin.apps.length) {
-        const admin_sdk = require('firebase-admin');
-        adminApp = admin_sdk.initializeApp({
-            credential: admin_sdk.credential.applicationDefault(),
-        });
-    } else {
-        adminApp = admin.apps[0] as admin.app.App;
+    const admin_sdk = require('firebase-admin');
+    if (admin_sdk.apps.length > 0) {
+        return admin_sdk.apps[0];
     }
-    return adminApp;
+    return admin_sdk.initializeApp({
+        credential: admin_sdk.credential.applicationDefault(),
+    });
 }
 
 export async function POST(req: NextRequest) {
@@ -43,9 +41,9 @@ export async function POST(req: NextRequest) {
     }
     
     // Initialize Firebase Admin (safe to call multiple times)
-    initializeFirebaseAdmin();
-    const messaging = require('firebase-admin/messaging').getMessaging(adminApp);
-    const db = require('firebase-admin/firestore').getFirestore(adminApp);
+    const app = initializeFirebaseAdmin();
+    const messaging = require('firebase-admin/messaging').getMessaging(app);
+    const db = require('firebase-admin/firestore').getFirestore(app);
 
     // 2. Get user's FCM tokens from Firestore
     const tokensSnapshot = await db.collection(`users/${userId}/fcmTokens`).get();
@@ -61,7 +59,7 @@ export async function POST(req: NextRequest) {
     const tokens = tokensSnapshot.docs.map((doc: any) => doc.id);
 
     // 3. Send notifications via FCM
-    const messagePayload: admin.messaging.MulticastMessage = {
+    const messagePayload = {
         tokens: tokens,
         notification: {
             title: alertData.notificationTitle,

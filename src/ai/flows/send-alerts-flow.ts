@@ -11,30 +11,27 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import type { Product } from '@/lib/types';
-import {initializeApp, getApps, App} from 'firebase-admin/app';
+import {initializeApp, getApps, App, credential} from 'firebase-admin/app';
 import {getFirestore} from 'firebase-admin/firestore';
-import { credential } from 'firebase-admin';
 import { differenceInDays, parseISO } from 'date-fns';
 
 // Helper function to initialize admin app safely
 const initializeFirebaseAdmin = (): App => {
-    if (!getApps().length) {
-        try {
-            // Use applicationDefault() which works in App Hosting environments
-            return initializeApp({
-              credential: credential.applicationDefault(),
-            });
-        } catch (e) {
-            console.error('Firebase Admin initialization error', e);
-            throw new Error('Could not initialize Firebase Admin SDK.');
-        }
+    const apps = getApps();
+    if (apps.length > 0) {
+        return apps[0];
     }
-    return getApps()[0];
+    // This works in App Hosting environments
+    return initializeApp({
+        credential: credential.applicationDefault(),
+    });
 }
 
 const StockAlertsInputSchema = z.object({
   userId: z.string(),
 });
+export type StockAlertsInput = z.infer<typeof StockAlertsInputSchema>;
+
 
 const StockAlertsOutputSchema = z.object({
   alertsFound: z.number(),
@@ -43,8 +40,10 @@ const StockAlertsOutputSchema = z.object({
   notificationTitle: z.string(),
   notificationBody: z.string(),
 });
+export type StockAlertsOutput = z.infer<typeof StockAlertsOutputSchema>;
 
-export async function getStockAlerts(input: z.infer<typeof StockAlertsInputSchema>): Promise<z.infer<typeof StockAlertsOutputSchema>> {
+
+export async function getStockAlerts(input: StockAlertsInput): Promise<StockAlertsOutput> {
   return stockAlertsFlow(input);
 }
 
