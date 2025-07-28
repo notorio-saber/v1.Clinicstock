@@ -9,7 +9,6 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 export const metadata: Metadata = {
   title: 'ClinicStock',
   description: 'Controle de estoque para clínicas de estética',
-  manifest: '/manifest.json',
 };
 
 export default function RootLayout({

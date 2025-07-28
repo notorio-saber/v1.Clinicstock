@@ -2,7 +2,6 @@ import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
-import { getMessaging, Messaging } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: "AIzaSyB0ae8Sx_tquzgYaukQj_S4YFNj-RMXbX8",
@@ -18,23 +17,18 @@ let app: FirebaseApp;
 let auth: Auth;
 let db: Firestore;
 let storage: FirebaseStorage;
-let messaging: Messaging | null = null;
 
 if (typeof window !== 'undefined' && !getApps().length) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
-  messaging = getMessaging(app);
 } else if (getApps().length) {
   app = getApp();
   auth = getAuth(app);
   db = getFirestore(app);
   storage = getStorage(app);
-  if (typeof window !== 'undefined') {
-    messaging = getMessaging(app);
-  }
 }
 
 // @ts-ignore
-export { app, auth, db, storage, messaging };
+export { app, auth, db, storage };
