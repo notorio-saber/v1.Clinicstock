@@ -15,9 +15,8 @@ import { useRouter } from 'next/navigation';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getToken, deleteToken } from 'firebase/messaging';
-import { doc, setDoc, deleteDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 
-import { sendStockAlerts } from '@/ai/flows/send-alerts-flow';
 
 async function requestNotificationPermission(userId: string) {
     if (!messaging) {
@@ -184,8 +183,14 @@ export default function ProfilePage() {
       if (!user) return;
       setIsSendingTest(true);
       try {
-          const result = await sendStockAlerts({ userId: user.uid });
-          if (result.success) {
+          const response = await fetch('/api/send-alert', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: user.uid }),
+          });
+          const result = await response.json();
+
+          if (response.ok) {
             if(result.alertsFound > 0 && result.notificationsSent > 0) {
                  toast({ title: 'Notificação de Teste Enviada!', description: `A notificação com ${result.alertsFound} alerta(s) foi enviada.`, className: 'bg-green-500 text-white' });
             } else if (result.alertsFound > 0) {
@@ -195,7 +200,7 @@ export default function ProfilePage() {
                  toast({ title: 'Nenhum Alerta', description: 'Seu estoque está em dia! Nenhuma notificação foi enviada.' });
             }
           } else {
-              throw new Error(result.message);
+              throw new Error(result.message || 'Erro desconhecido');
           }
       } catch (error: any) {
          toast({ variant: 'destructive', title: 'Erro ao Enviar Teste', description: error.message });

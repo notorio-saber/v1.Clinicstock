@@ -1,105 +1,95 @@
 'use server';
 /**
- * @fileOverview A flow to send stock alerts via push notifications.
+ * @fileOverview A flow to check for stock alerts for a user.
+ * This flow identifies expiring and low-stock products but does not send notifications.
  *
- * - sendStockAlerts - Checks for alerts and sends notifications to a user.
+ * - getStockAlerts - Checks for alerts and returns the details.
+ * - StockAlertsInput - The input type for the getStockAlerts function.
+ * - StockAlertsOutput - The return type for the getStockAlerts function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'zod';
+import { ai } from '@/ai/genkit';
+import { z } from 'zod';
 import type { Product } from '@/lib/types';
-import type { FirebaseApp } from 'firebase-admin/app';
+import {initializeApp, getApps, App} from 'firebase-admin/app';
+import {getFirestore} from 'firebase-admin/firestore';
+import { credential } from 'firebase-admin';
+import { differenceInDays, parseISO } from 'date-fns';
 
-// NOTE: We are intentionally NOT importing firebase-admin at the top level.
-// This is to prevent Next.js from trying to bundle it for the client.
-
-// This is the function that will be called from the UI.
-export async function sendStockAlerts({ userId }: { userId: string }): Promise<{
-  success: boolean;
-  message: string;
-  alertsFound: number;
-  tokensFound: number;
-  notificationsSent: number;
-}> {
-  return sendStockAlertsFlow({ userId });
+// Helper function to initialize admin app safely
+const initializeFirebaseAdmin = (): App => {
+    if (!getApps().length) {
+        try {
+            // Use applicationDefault() which works in App Hosting environments
+            return initializeApp({
+              credential: credential.applicationDefault(),
+            });
+        } catch (e) {
+            console.error('Firebase Admin initialization error', e);
+            throw new Error('Could not initialize Firebase Admin SDK.');
+        }
+    }
+    return getApps()[0];
 }
 
+const StockAlertsInputSchema = z.object({
+  userId: z.string(),
+});
 
-const sendStockAlertsFlow = ai.defineFlow(
+const StockAlertsOutputSchema = z.object({
+  alertsFound: z.number(),
+  expiringSoon: z.array(z.string()),
+  lowStock: z.array(z.string()),
+  notificationTitle: z.string(),
+  notificationBody: z.string(),
+});
+
+export async function getStockAlerts(input: z.infer<typeof StockAlertsInputSchema>): Promise<z.infer<typeof StockAlertsOutputSchema>> {
+  return stockAlertsFlow(input);
+}
+
+const stockAlertsFlow = ai.defineFlow(
   {
-    name: 'sendStockAlertsFlow', // Renamed to avoid conflict with exported function
-    inputSchema: z.object({ userId: z.string() }),
-    outputSchema: z.object({
-      success: z.boolean(),
-      message: z.string(),
-      alertsFound: z.number(),
-      tokensFound: z.number(),
-      notificationsSent: z.number(),
-    }),
+    name: 'stockAlertsFlow',
+    inputSchema: StockAlertsInputSchema,
+    outputSchema: StockAlertsOutputSchema,
   },
   async ({ userId }) => {
-    // Dynamically import dependencies only when the flow is executed.
-    const admin = (await import('firebase-admin')).default;
-    const { differenceInDays, parseISO } = await import('date-fns');
 
-    // Helper function to initialize admin app safely
-    const initializeFirebaseAdmin = (): FirebaseApp => {
-        if (!admin.apps.length) {
-          try {
-            // Use applicationDefault() which works in App Hosting environments
-            return admin.initializeApp({
-              credential: admin.credential.applicationDefault(),
-            });
-          } catch (e) {
-            console.error('Firebase Admin initialization error', e);
-            // Re-throw or handle as a fatal error for this flow
-            throw new Error('Could not initialize Firebase Admin SDK.');
-          }
-        }
-        return admin.app();
+    const adminApp = initializeFirebaseAdmin();
+    const db = getFirestore(adminApp);
+
+    const productsSnapshot = await db.collection(`users/${userId}/products`).get();
+
+    const expiringSoon: string[] = [];
+    const lowStock: string[] = [];
+
+    if (productsSnapshot.empty) {
+      return { alertsFound: 0, expiringSoon, lowStock, notificationTitle: '', notificationBody: '' };
     }
 
-    try {
-        const adminApp = initializeFirebaseAdmin();
-        const db = adminApp.firestore();
-        const messaging = adminApp.messaging();
+    productsSnapshot.forEach((doc) => {
+        const product = doc.data() as Product;
+        if (product.currentStock === 0) return;
 
-        // 1. Get user's products
-        const productsSnapshot = await db.collection(`users/${userId}/products`).get();
-        if (productsSnapshot.empty) {
-            return { success: true, message: 'No products found for user.', alertsFound: 0, tokensFound: 0, notificationsSent: 0 };
-        }
-
-        const expiringSoon: string[] = [];
-        const lowStock: string[] = [];
-
-        productsSnapshot.forEach((doc) => {
-            const product = doc.data() as Product;
-            if (product.currentStock === 0) return;
-
-            // Ensure expiryDate is a valid string before parsing
-            if (typeof product.expiryDate !== 'string' || !product.expiryDate) {
-                return;
-            }
-            
+        if (typeof product.expiryDate === 'string' && product.expiryDate) {
             const daysToExpiry = differenceInDays(parseISO(product.expiryDate), new Date());
-            
             if (daysToExpiry >= 0 && daysToExpiry <= 7) {
-            expiringSoon.push(product.name);
+                expiringSoon.push(product.name);
             }
-            if (product.currentStock > 0 && product.currentStock <= product.minimumStock) {
-            lowStock.push(product.name);
-            }
-        });
-        
-        const totalAlerts = expiringSoon.length + lowStock.length;
-        if (totalAlerts === 0) {
-            return { success: true, message: 'No alerts to send.', alertsFound: 0, tokensFound: 0, notificationsSent: 0 };
         }
+        
+        if (product.currentStock > 0 && product.currentStock <= product.minimumStock) {
+            lowStock.push(product.name);
+        }
+    });
 
-        // 2. Construct notification message
-        let title = 'Alerta de Estoque!';
-        let body = '';
+    const totalAlerts = expiringSoon.length + lowStock.length;
+    let title = '';
+    let body = '';
+
+    if (totalAlerts > 0) {
+        title = 'Alerta de Estoque!';
         if (expiringSoon.length > 0 && lowStock.length > 0) {
             body = `Você tem ${expiringSoon.length} produto(s) vencendo e ${lowStock.length} com estoque baixo.`;
         } else if (expiringSoon.length > 0) {
@@ -107,64 +97,14 @@ const sendStockAlertsFlow = ai.defineFlow(
         } else {
             body = `Você tem ${lowStock.length} produto(s) com estoque baixo.`;
         }
-
-        // 3. Get user's FCM tokens
-        const tokensSnapshot = await db.collection(`users/${userId}/fcmTokens`).get();
-        if (tokensSnapshot.empty) {
-            return { success: true, message: 'No notification tokens found for user.', alertsFound: totalAlerts, tokensFound: 0, notificationsSent: 0 };
-        }
-        const tokens = tokensSnapshot.docs.map(doc => doc.id);
-        
-        // 4. Send notifications
-        const messagePayload: admin.messaging.MulticastMessage = {
-            tokens: tokens,
-            notification: {
-            title: title,
-            body: body,
-            },
-            webpush: {
-            notification: {
-                icon: '/logo.png',
-            },
-            fcmOptions: {
-                link: '/alerts'
-            }
-            }
-        };
-        
-        const response = await messaging.sendEachForMulticast(messagePayload);
-
-        // 5. Clean up invalid tokens
-        const tokensToDelete: string[] = [];
-        response.responses.forEach((result, index) => {
-            if (!result.success) {
-            const error = result.error?.code;
-            if (error === 'messaging/registration-token-not-registered' ||
-                error === 'messaging/invalid-registration-token') {
-                tokensToDelete.push(tokens[index]);
-            }
-            }
-        });
-
-        if (tokensToDelete.length > 0) {
-            const batch = db.batch();
-            tokensToDelete.forEach(token => {
-            batch.delete(db.collection(`users/${userId}/fcmTokens`).doc(token));
-            });
-            await batch.commit();
-        }
-
-        return { 
-            success: true, 
-            message: `Sent ${response.successCount} notifications.`,
-            alertsFound: totalAlerts,
-            tokensFound: tokens.length,
-            notificationsSent: response.successCount
-        };
-    } catch (error) {
-        console.error('Error sending stock alerts:', error);
-        const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
-        return { success: false, message: errorMessage, alertsFound: 0, tokensFound: 0, notificationsSent: 0 };
     }
+
+    return {
+      alertsFound: totalAlerts,
+      expiringSoon,
+      lowStock,
+      notificationTitle: title,
+      notificationBody: body,
+    };
   }
 );
