@@ -10,10 +10,10 @@ import type * as admin from 'firebase-admin';
 // Helper function to initialize Firebase Admin SDK
 // This ensures it's initialized only once.
 let adminApp: admin.app.App;
-function initializeFirebaseAdmin() {
-    const admin_sdk = require('firebase-admin');
+async function initializeFirebaseAdmin() {
+    const admin_sdk = await import('firebase-admin');
     if (admin_sdk.apps.length > 0) {
-        return admin_sdk.apps[0];
+        return admin_sdk.apps[0]!;
     }
     return admin_sdk.initializeApp({
         credential: admin_sdk.credential.applicationDefault(),
@@ -41,9 +41,9 @@ export async function POST(req: NextRequest) {
     }
     
     // Initialize Firebase Admin (safe to call multiple times)
-    const app = initializeFirebaseAdmin();
-    const messaging = require('firebase-admin/messaging').getMessaging(app);
-    const db = require('firebase-admin/firestore').getFirestore(app);
+    const app = await initializeFirebaseAdmin();
+    const messaging = (await import('firebase-admin/messaging')).getMessaging(app);
+    const db = (await import('firebase-admin/firestore')).getFirestore(app);
 
     // 2. Get user's FCM tokens from Firestore
     const tokensSnapshot = await db.collection(`users/${userId}/fcmTokens`).get();
