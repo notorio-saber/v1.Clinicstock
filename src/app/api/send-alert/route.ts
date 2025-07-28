@@ -15,6 +15,7 @@ async function initializeFirebaseAdmin() {
     if (admin_sdk.apps.length > 0) {
         return admin_sdk.apps[0]!;
     }
+    // This works in App Hosting environments
     return admin_sdk.initializeApp({
         credential: admin_sdk.credential.applicationDefault(),
     });
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     const tokens = tokensSnapshot.docs.map((doc: any) => doc.id);
 
     // 3. Send notifications via FCM
-    const messagePayload = {
+    const messagePayload: admin.messaging.MulticastMessage = {
         tokens: tokens,
         notification: {
             title: alertData.notificationTitle,
