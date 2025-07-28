@@ -13,9 +13,21 @@ import type { FirebaseApp } from 'firebase-admin/app';
 // NOTE: We are intentionally NOT importing firebase-admin at the top level.
 // This is to prevent Next.js from trying to bundle it for the client.
 
-export const sendStockAlerts = ai.defineFlow(
+// This is the function that will be called from the UI.
+export async function sendStockAlerts({ userId }: { userId: string }): Promise<{
+  success: boolean;
+  message: string;
+  alertsFound: number;
+  tokensFound: number;
+  notificationsSent: number;
+}> {
+  return sendStockAlertsFlow({ userId });
+}
+
+
+const sendStockAlertsFlow = ai.defineFlow(
   {
-    name: 'sendStockAlerts',
+    name: 'sendStockAlertsFlow', // Renamed to avoid conflict with exported function
     inputSchema: z.object({ userId: z.string() }),
     outputSchema: z.object({
       success: z.boolean(),
