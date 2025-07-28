@@ -7,26 +7,10 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import * as admin from 'firebase-admin';
-import { differenceInDays, parseISO } from 'date-fns';
 import type { Product } from '@/lib/types';
 
-
-// Helper function to initialize admin app safely
-function initializeFirebaseAdmin() {
-    if (!admin.apps.length) {
-      try {
-        admin.initializeApp({
-          credential: admin.credential.applicationDefault(),
-          databaseURL: `https://${process.env.GCLOUD_PROJECT}.firebaseio.com`,
-        });
-      } catch (e) {
-        console.error('Firebase Admin initialization error', e);
-      }
-    }
-    return admin;
-}
-
+// NOTE: We are intentionally NOT importing firebase-admin at the top level.
+// This is to prevent Next.js from trying to bundle it for the client.
 
 export const sendStockAlerts = ai.defineFlow(
   {
@@ -41,6 +25,25 @@ export const sendStockAlerts = ai.defineFlow(
     }),
   },
   async ({ userId }) => {
+    // Dynamically import dependencies only when the flow is executed.
+    const admin = (await import('firebase-admin')).default;
+    const { differenceInDays, parseISO } = await import('date-fns');
+
+    // Helper function to initialize admin app safely
+    const initializeFirebaseAdmin = () => {
+        if (!admin.apps.length) {
+          try {
+            admin.initializeApp({
+              credential: admin.credential.applicationDefault(),
+              databaseURL: `https://${process.env.GCLOUD_PROJECT}.firebaseio.com`,
+            });
+          } catch (e) {
+            console.error('Firebase Admin initialization error', e);
+          }
+        }
+        return admin;
+    }
+
     const adminApp = initializeFirebaseAdmin();
     const db = adminApp.firestore();
     const messaging = adminApp.messaging();
@@ -63,7 +66,6 @@ export const sendStockAlerts = ai.defineFlow(
         const product = doc.data() as Product;
         if (product.currentStock === 0) return;
 
-        // Ensure expiryDate is a valid string before parsing
         if (typeof product.expiryDate !== 'string' || !product.expiryDate) {
             return;
         }
@@ -110,10 +112,10 @@ export const sendStockAlerts = ai.defineFlow(
         },
         webpush: {
           notification: {
-            icon: '/logo.png', // Make sure you have a logo.png in your public folder
+            icon: '/logo.png',
           },
           fcmOptions: {
-            link: '/alerts' // Open the alerts page on click
+            link: '/alerts'
           }
         }
       };
