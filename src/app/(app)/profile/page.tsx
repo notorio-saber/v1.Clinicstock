@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Save, Shield, LogOut, Loader2, Upload } from 'lucide-react';
+import { Save, Shield, LogOut, Loader2, Upload, CreditCard } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
 import { signOut, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, storage } from '@/lib/firebase';
@@ -14,10 +14,11 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Skeleton } from '@/components/ui/skeleton';
+import Link from 'next/link';
 
 
 export default function ProfilePage() {
-  const { user, loading: authLoading, reloadUser } = useAuth();
+  const { user, subscription, loading: authLoading, reloadUser } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -191,6 +192,25 @@ export default function ProfilePage() {
           </Button>
         </CardContent>
       </Card>
+      
+       <Card>
+          <CardHeader>
+            <CardTitle>Assinatura</CardTitle>
+            <CardDescription>
+                {subscription?.isActive 
+                    ? `Seu plano está ativo.` 
+                    : 'Você não tem uma assinatura ativa. Escolha um plano para continuar.'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link href="/subscription" passHref>
+                <Button variant="outline" className="w-full">
+                    <CreditCard className="mr-2 h-4 w-4"/>
+                    Gerenciar Assinatura
+                </Button>
+            </Link>
+          </CardContent>
+        </Card>
 
       <Card>
           <CardHeader>
