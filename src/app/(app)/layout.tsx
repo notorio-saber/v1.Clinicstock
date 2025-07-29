@@ -4,9 +4,20 @@ import Header from './_components/header';
 import BottomNav from './_components/bottom-nav';
 import useAuth from '@/hooks/useAuth';
 import { Loader } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import SubscriptionModal from './subscription/page';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, subscription, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace('/login');
+    }
+  }, [user, loading, router]);
+
 
   if (loading) {
     return (
@@ -19,6 +30,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return null; // O hook useAuth já vai redirecionar
+  }
+
+  // Se o usuário está logado mas não tem uma assinatura ativa, mostre a página de assinatura.
+  if (!subscription?.isActive) {
+      return <SubscriptionModal />;
   }
 
   return (

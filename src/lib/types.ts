@@ -37,3 +37,11 @@ export type StockMovement = {
   newExpiryDate?: string;
   newCostPrice?: number;
 };
+
+export interface Subscription {
+  id: string;
+  status: 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'unpaid';
+  current_period_end: { seconds: number; nanoseconds: number; };
+  // Adicione outros campos conforme a sincronização da extensão do Stripe
+  // Ex: price: string, cancel_at_period_end: boolean, etc.
+}
