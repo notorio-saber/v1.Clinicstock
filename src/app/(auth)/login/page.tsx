@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import Link from 'next/link';
 import { auth } from '@/lib/firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
@@ -69,20 +69,15 @@ export default function LoginPage() {
     setIsGoogleLoading(true);
     const provider = new GoogleAuthProvider();
     try {
-      await signInWithPopup(auth, provider);
-      toast({
-        title: 'Login bem-sucedido!',
-        description: 'Redirecionando para o painel...',
-      });
-      router.push('/dashboard');
+      await signInWithRedirect(auth, provider);
+      // O redirecionamento tratará do resto. O código abaixo pode não ser executado se o redirecionamento for rápido.
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Erro no Login com Google',
         description: 'Não foi possível fazer login com o Google. Tente novamente.',
       });
-    } finally {
-      setIsGoogleLoading(false);
+       setIsGoogleLoading(false);
     }
   }
 
