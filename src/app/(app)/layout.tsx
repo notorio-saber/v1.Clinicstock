@@ -6,7 +6,6 @@ import useAuth from '@/hooks/useAuth';
 import { Loader } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import SubscriptionModal from './subscription/page';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, subscription, loading } = useAuth();
@@ -18,23 +17,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, router]);
 
+  useEffect(() => {
+    if (!loading && user && !subscription?.isActive) {
+        router.replace('/subscription');
+    }
+  }, [user, subscription, loading, router]);
 
-  if (loading) {
+
+  if (loading || !user || !subscription?.isActive) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-secondary">
         <Loader className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">Verificando autenticação...</p>
+        <p className="text-muted-foreground">Verificando credenciais e assinatura...</p>
       </div>
     );
-  }
-
-  if (!user) {
-    return null; // O hook useAuth já vai redirecionar
-  }
-
-  // Se o usuário está logado mas não tem uma assinatura ativa, mostre a página de assinatura.
-  if (!subscription?.isActive) {
-      return <SubscriptionModal />;
   }
 
   return (
