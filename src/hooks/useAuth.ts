@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { onAuthStateChanged, User, getRedirectResult } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { useRouter, usePathname } from 'next/navigation';
 import { doc, onSnapshot, collection } from 'firebase/firestore';
@@ -23,17 +23,40 @@ export default function useAuth() {
   }
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-      if (currentUser) {
-        setUser(currentUser);
-      } else {
-        setUser(null);
-        setSubscription(null);
-        setLoading(false);
-      }
-    });
+    const processRedirectResult = async () => {
+        try {
+            const result = await getRedirectResult(auth);
+            if (result) {
+                // Usuário acabou de logar via redirect. O onAuthStateChanged vai lidar com o estado.
+                // Aqui você pode adicionar lógica específica se precisar dos dados do `result`
+            }
+        } catch (error) {
+            console.error("Erro ao obter resultado do redirecionamento:", error);
+        } finally {
+            // Após processar o redirect, a lógica principal pode continuar
+             const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+              if (currentUser) {
+                setUser(currentUser);
+              } else {
+                setUser(null);
+                setSubscription(null);
+                setLoading(false);
+              }
+            });
+            // O unsubscribe será chamado no retorno do useEffect principal
+            return unsubscribeAuth;
+        }
+    };
+    
+    const unsubscribePromise = processRedirectResult();
 
-    return () => unsubscribeAuth();
+    return () => {
+        unsubscribePromise.then(unsubscribe => {
+            if (unsubscribe) {
+                unsubscribe();
+            }
+        });
+    };
   }, []);
 
   useEffect(() => {
@@ -61,6 +84,9 @@ export default function useAuth() {
         setSubscription({ id: '', isActive: false });
       }
       setLoading(false);
+    }, (error) => {
+        console.error("Erro ao buscar assinatura:", error);
+        setLoading(false);
     });
 
     return () => {
@@ -71,10 +97,18 @@ export default function useAuth() {
 
   useEffect(() => {
     const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/signup');
-    if (!loading && !user && !isAuthPage) {
+    const isSubscriptionPage = pathname.startsWith('/subscription');
+
+    if (loading) return; // Não faça nada enquanto carrega
+
+    if (!user && !isAuthPage) {
         router.replace('/login');
+    } else if (user && !subscription?.isActive && !isSubscriptionPage) {
+        router.replace('/subscription');
+    } else if (user && subscription?.isActive && (isAuthPage || isSubscriptionPage)) {
+        router.replace('/dashboard');
     }
-  }, [user, loading, router, pathname]);
+  }, [user, subscription, loading, router, pathname]);
 
   return { user, subscription, loading, reloadUser };
 }

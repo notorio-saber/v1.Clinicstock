@@ -70,12 +70,12 @@ export default function LoginPage() {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithRedirect(auth, provider);
-      // O redirecionamento tratará do resto. O código abaixo pode não ser executado se o redirecionamento for rápido.
+      // O redirecionamento tratará do resto. A lógica para capturar o usuário está no useAuth.
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Erro no Login com Google',
-        description: 'Não foi possível fazer login com o Google. Tente novamente.',
+        description: 'Não foi possível iniciar o login com o Google. Tente novamente.',
       });
        setIsGoogleLoading(false);
     }
@@ -116,7 +116,7 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button type="submit" className="w-full" disabled={isLoading || isGoogleLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Entrar
               </Button>
@@ -134,7 +134,7 @@ export default function LoginPage() {
             </div>
            </div>
 
-            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isGoogleLoading}>
+            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isGoogleLoading || isLoading}>
                  {isGoogleLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                  ) : (

@@ -9,27 +9,7 @@ import { useEffect } from 'react';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, subscription, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (loading) {
-      return; // Wait until loading is complete
-    }
-
-    if (!user) {
-      router.replace('/login');
-      return;
-    }
-    
-    if (user && !subscription?.isActive) {
-      router.replace('/subscription');
-      return;
-    }
-
-  }, [user, subscription, loading, router]);
-
-
-  // Show a loading screen while checking auth and subscription status
+  
   if (loading || !user || !subscription?.isActive) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-secondary">
@@ -39,7 +19,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
   
-  // Render the app content if user and subscription are valid
   return (
     <div className="flex h-screen flex-col bg-secondary">
       <Header />
