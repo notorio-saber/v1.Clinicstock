@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect, createContext, ReactNode, useCallback } from 'react';
@@ -6,7 +5,7 @@ import { onAuthStateChanged, User, getRedirectResult, signOut } from 'firebase/a
 import { auth, db } from '@/lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
 import type { Subscription } from '@/lib/types';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
@@ -23,7 +22,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [subscription, setSubscription] = useState<{ id: string; isActive: boolean } | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-  const pathname = usePathname();
 
   const reloadUser = useCallback(async () => {
     if (auth.currentUser) {
@@ -39,64 +37,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/login');
   },[router]);
 
-  useEffect(() => {
-    // This effect should only run once to set up the listener and check for redirect result.
-    // It's crucial to handle the entire auth flow to prevent race conditions.
+   useEffect(() => {
+    // This is the core logic that handles auth state changes.
+    // It runs once on mount.
+    setLoading(true);
     
-    // First, check for the result of a redirect authentication
+    // First, try to get the result of a potential redirect.
+    // This is crucial for Google/social logins.
     getRedirectResult(auth)
       .then((result) => {
-        if (result) {
-          // User has successfully signed in via redirect.
-          // onAuthStateChanged will handle setting the user state.
-          // We don't need to do anything here as the listener will fire.
-        }
+        // If a result exists, onAuthStateChanged will handle the new user state.
+        // We don't need to do anything here, because the listener below will fire.
       })
       .catch((error) => {
-        // Handle Errors here.
-        console.error("Error getting redirect result:", error);
+        console.error("Auth: Error getting redirect result", error);
+      })
+      .finally(() => {
+         // Now, set up the onAuthStateChanged listener.
+         // This will run immediately with the current user, or when the user logs in/out.
+        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+          if (firebaseUser) {
+            setUser(firebaseUser);
+            // User is signed in, check for their subscription.
+            const subRef = collection(db, 'customers', firebaseUser.uid, 'subscriptions');
+            const unsubscribeSub = onSnapshot(subRef, (snapshot) => {
+              const activeSubscriptions = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() } as Subscription))
+                .filter(sub => ['active', 'trialing'].includes(sub.status));
+              
+              if (activeSubscriptions.length > 0) {
+                setSubscription({ id: activeSubscriptions[0].id, isActive: true });
+              } else {
+                setSubscription({ id: '', isActive: false });
+              }
+              setLoading(false); 
+            }, (error) => {
+              console.error("Auth: Error fetching subscription", error);
+              setSubscription({ id: '', isActive: false });
+              setLoading(false);
+            });
+            
+            return () => unsubscribeSub();
+          } else {
+            // No user is signed in.
+            setUser(null);
+            setSubscription(null);
+            setLoading(false);
+          }
+        });
+
+        return () => unsubscribe();
       });
 
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser) {
-        if(user && firebaseUser.uid === user.uid) {
-            // User is already set, no need to re-run everything
-            setLoading(false);
-            return;
-        }
-        setUser(firebaseUser);
-        
-        // User is signed in, now check for their subscription.
-        const subRef = collection(db, 'customers', firebaseUser.uid, 'subscriptions');
-        const unsubscribeSub = onSnapshot(subRef, (snapshot) => {
-          const activeSubscriptions = snapshot.docs
-            .map(doc => ({ id: doc.id, ...doc.data() } as Subscription))
-            .filter(sub => ['active', 'trialing'].includes(sub.status));
-          
-          if (activeSubscriptions.length > 0) {
-            setSubscription({ id: activeSubscriptions[0].id, isActive: true });
-          } else {
-            setSubscription({ id: '', isActive: false });
-          }
-          setLoading(false); // Auth flow is complete for a signed-in user
-        }, (error) => {
-          console.error("Error fetching subscription:", error);
-          setSubscription({ id: '', isActive: false });
-          setLoading(false); // Still complete, but with an error state for subscription
-        });
-        
-        return () => unsubscribeSub();
-
-      } else {
-        // No user is signed in.
-        setUser(null);
-        setSubscription(null);
-        setLoading(false); // Auth flow is complete for a signed-out user
-      }
-    });
-
-    return () => unsubscribe(); // Cleanup the auth state listener
-  }, []); // Empty dependency array ensures this runs only once
+  }, []);
 
   const value = { user, subscription, loading, reloadUser, logout };
 

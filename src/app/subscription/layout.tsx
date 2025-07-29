@@ -6,7 +6,7 @@ export default function SubscriptionLayout({ children }: { children: React.React
        <div className="absolute top-8">
          <Logo />
        </div>
-       {children}
+       <div className="w-full max-w-4xl pt-16">
+        {children}
+       </div>
     </div>
-  );
-}
