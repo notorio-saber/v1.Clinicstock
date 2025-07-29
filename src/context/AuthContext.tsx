@@ -1,6 +1,25 @@
 'use client';
 
 import { useState, useEffect, createContext, ReactNode, useCallback } from 'react';
+import { onAuthStateChanged, User, getRedirectResult, signOut, GoogleAuthProvider } from 'firebase/auth';
+import { auth, db } from '@/lib/firebase';
+import { collection, onSnapshot } from 'firebase/firestore';
+import type { Subscription } from '@/lib/types';
+
+interface AuthContextType {
+  user: User | null;
+  subscription: { id: string; isActive: boolean } | null;
+  loading: boolean;
+  reloadUser: () => Promise<void>;
+  logout: () => Promise<void>;
+}
+
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = 'use client';
+
+import { useState, useEffect, createContext, ReactNode, useCallback } from 'react';
 import { onAuthStateChanged, User, getRedirectResult, signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
