@@ -4,12 +4,13 @@ import Header from './_components/header';
 import BottomNav from './_components/bottom-nav';
 import useAuth from '@/hooks/useAuth';
 import { Loader } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useEffect } from 'react';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, subscription, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (loading) return; // Wait for the auth state to be determined
@@ -18,15 +19,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.replace('/login');
       return;
     }
-
-    if (!subscription?.isActive) {
-      router.replace('/subscription');
+    
+    // Only check for subscription if the user is authenticated
+    if (user && !subscription?.isActive) {
+        // Allow access to profile page even without subscription
+        if (pathname !== '/profile') {
+           router.replace('/subscription');
+        }
     }
-  }, [user, subscription, loading, router]);
+
+  }, [user, subscription, loading, router, pathname]);
   
   // While loading, or if user is null and we are about to redirect, show a loader.
   // Or if user is present but subscription isn't active and we are about to redirect.
-  if (loading || !user || !subscription?.isActive) {
+  if (loading || !user || (!subscription?.isActive && pathname !== '/profile')) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-secondary">
         <Loader className="h-8 w-8 animate-spin text-primary" />

@@ -56,6 +56,11 @@ export default function SubscriptionPage() {
             body: JSON.stringify({ priceId: priceId, userId: user.uid }),
         });
 
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(errorText || 'Failed to create checkout session');
+        }
+
         const { url } = await response.json();
         if (url) {
             window.location.href = url;
@@ -101,24 +106,25 @@ export default function SubscriptionPage() {
     );
   }
   
-  // This logic is important to redirect user if they land here by mistake
   if (subscription?.isActive) {
+      // This timeout gives a moment for the main layout to redirect
+      setTimeout(() => {
+        if (window.location.pathname === '/subscription') {
+            router.push('/dashboard');
+        }
+      }, 2000);
+
       return (
         <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-secondary">
-             <Card className="w-full max-w-md">
+             <Card className="w-full max-w-md text-center">
                 <CardHeader>
                     <CardTitle>Sua assinatura já está ativa!</CardTitle>
                     <CardDescription>
-                        Você será redirecionado para o painel principal.
+                        Redirecionando para o painel principal...
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <Button 
-                        className="w-full" 
-                        onClick={() => router.push('/dashboard')}
-                    >
-                        Ir para o Dashboard
-                    </Button>
+                   <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto" />
                 </CardContent>
             </Card>
         </div>

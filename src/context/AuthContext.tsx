@@ -3,7 +3,7 @@
 import { useState, useEffect, createContext, ReactNode, useCallback } from 'react';
 import { onAuthStateChanged, User, getRedirectResult, signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import type { Subscription } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
@@ -39,62 +39,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const processAuth = async () => {
-        // First, check for redirect result to handle Google sign-in
-        try {
-            const result = await getRedirectResult(auth);
-            if (result) {
-                // User signed in or linked via redirect.
-                // onAuthStateChanged will handle the user state.
-            }
-        } catch (error) {
-            console.error("Auth: Error getting redirect result", error);
-        }
+      // It's important to handle the redirect result first.
+      try {
+        await getRedirectResult(auth);
+      } catch (error) {
+        console.error("Auth: Error getting redirect result", error);
+      }
 
-        // Set up the main auth state listener
-        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
-            if (firebaseUser) {
-                setUser(firebaseUser);
-                const subRef = collection(db, 'customers', firebaseUser.uid, 'subscriptions');
-                
-                const unsubscribeSub = onSnapshot(subRef, (snapshot) => {
-                    if (snapshot.empty) {
-                        setSubscription({ id: '', isActive: false });
-                        setLoading(false);
-                        return;
-                    }
+      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        setLoading(true); // Set loading true whenever auth state changes
+        if (firebaseUser) {
+          setUser(firebaseUser);
+          // Now that we have a user, listen for subscription changes.
+          const subRef = collection(db, 'customers', firebaseUser.uid, 'subscriptions');
+          const q = query(subRef, where("status", "in", ["trialing", "active"]));
 
-                    const activeSubscriptions = snapshot.docs
-                        .map(doc => ({ id: doc.id, ...doc.data() } as Subscription))
-                        .filter(sub => ['active', 'trialing'].includes(sub.status));
-
-                    if (activeSubscriptions.length > 0) {
-                        setSubscription({ id: activeSubscriptions[0].id, isActive: true });
-                    } else {
-                        setSubscription({ id: '', isActive: false });
-                    }
-                    setLoading(false);
-                }, (error) => {
-                    console.error("Auth: Error fetching subscription", error);
-                    setSubscription({ id: '', isActive: false });
-                    setLoading(false);
-                });
-                
-                // We return the subscription unsubscriber to be called on cleanup
-                return () => unsubscribeSub();
-
+          const unsubscribeSub = onSnapshot(q, (snapshot) => {
+            if (snapshot.empty) {
+              setSubscription({ id: '', isActive: false });
             } else {
-                setUser(null);
-                setSubscription(null);
-                setLoading(false);
+              const sub = snapshot.docs[0].data() as Subscription;
+              setSubscription({ id: snapshot.docs[0].id, isActive: true });
             }
-        });
+            setLoading(false); // Done loading after getting sub status
+          }, (error) => {
+            console.error("Auth: Error fetching subscription", error);
+            // This is critical: if we have a permissions error, we must assume no subscription
+            // and stop loading so the UI can react.
+            setSubscription({ id: '', isActive: false });
+            setLoading(false);
+          });
+          
+          return () => unsubscribeSub(); // Cleanup subscription listener
+        } else {
+          // No user is signed in.
+          setUser(null);
+          setSubscription(null);
+          setLoading(false);
+        }
+      });
 
-        // Cleanup the main auth state listener
-        return () => unsubscribe();
+      return () => unsubscribe(); // Cleanup auth state listener
     };
 
     processAuth();
   }, []);
+
 
   const value = { user, subscription, loading, reloadUser, logout };
 
