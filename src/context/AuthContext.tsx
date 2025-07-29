@@ -37,49 +37,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     router.push('/login');
   },[router]);
 
-   useEffect(() => {
-    setLoading(true);
-    
-    getRedirectResult(auth)
-      .then((result) => {
-        // If a result exists, onAuthStateChanged will handle the new user state.
-      })
-      .catch((error) => {
-        console.error("Auth: Error getting redirect result", error);
-      })
-      .finally(() => {
-        const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-          if (firebaseUser) {
-            setUser(firebaseUser);
-            const subRef = collection(db, 'customers', firebaseUser.uid, 'subscriptions');
-            const unsubscribeSub = onSnapshot(subRef, (snapshot) => {
-              const activeSubscriptions = snapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() } as Subscription))
-                .filter(sub => ['active', 'trialing'].includes(sub.status));
-              
-              if (activeSubscriptions.length > 0) {
-                setSubscription({ id: activeSubscriptions[0].id, isActive: true });
-              } else {
-                setSubscription({ id: '', isActive: false });
-              }
-              setLoading(false); 
-            }, (error) => {
-              console.error("Auth: Error fetching subscription", error);
-              setSubscription({ id: '', isActive: false });
-              setLoading(false);
-            });
-            
-            return () => unsubscribeSub();
-          } else {
-            setUser(null);
-            setSubscription(null);
-            setLoading(false);
-          }
+  useEffect(() => {
+    const processAuth = async () => {
+        // First, check for redirect result to handle Google sign-in
+        try {
+            const result = await getRedirectResult(auth);
+            if (result) {
+                // User signed in or linked via redirect.
+                // onAuthStateChanged will handle the user state.
+            }
+        } catch (error) {
+            console.error("Auth: Error getting redirect result", error);
+        }
+
+        // Set up the main auth state listener
+        const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: User | null) => {
+            if (firebaseUser) {
+                setUser(firebaseUser);
+                const subRef = collection(db, 'customers', firebaseUser.uid, 'subscriptions');
+                
+                const unsubscribeSub = onSnapshot(subRef, (snapshot) => {
+                    if (snapshot.empty) {
+                        setSubscription({ id: '', isActive: false });
+                        setLoading(false);
+                        return;
+                    }
+
+                    const activeSubscriptions = snapshot.docs
+                        .map(doc => ({ id: doc.id, ...doc.data() } as Subscription))
+                        .filter(sub => ['active', 'trialing'].includes(sub.status));
+
+                    if (activeSubscriptions.length > 0) {
+                        setSubscription({ id: activeSubscriptions[0].id, isActive: true });
+                    } else {
+                        setSubscription({ id: '', isActive: false });
+                    }
+                    setLoading(false);
+                }, (error) => {
+                    console.error("Auth: Error fetching subscription", error);
+                    setSubscription({ id: '', isActive: false });
+                    setLoading(false);
+                });
+                
+                // We return the subscription unsubscriber to be called on cleanup
+                return () => unsubscribeSub();
+
+            } else {
+                setUser(null);
+                setSubscription(null);
+                setLoading(false);
+            }
         });
 
+        // Cleanup the main auth state listener
         return () => unsubscribe();
-      });
+    };
 
+    processAuth();
   }, []);
 
   const value = { user, subscription, loading, reloadUser, logout };
