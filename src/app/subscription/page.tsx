@@ -2,10 +2,13 @@
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import useAuth from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
 
 const plans = [
     {
@@ -36,9 +39,10 @@ const plans = [
     }
 ]
 
-export default function SubscriptionModal() {
-  const { user, subscription } = useAuth();
+export default function SubscriptionPage() {
+  const { user, subscription, loading } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
 
   const handleCreateCheckout = async (priceId: string) => {
@@ -91,32 +95,55 @@ export default function SubscriptionModal() {
     }
   };
 
-  const renderContent = () => {
-    if (subscription?.isActive) {
-        return (
-             <Card className="w-full max-w-md">
-                <CardHeader>
-                    <CardTitle>Você já é um assinante!</CardTitle>
-                    <CardDescription>
-                        Obrigado por fazer parte do ClinicStock. Sua assinatura está ativa.
-                        Acesse a sua conta no Stripe para gerenciar seus dados de pagamento.
-                    </CardDescription>
-                </CardHeader>
-                <CardFooter>
-                    <Button 
-                        className="w-full" 
-                        onClick={handleManageSubscription}
-                        disabled={loadingPriceId === 'manage'}
-                    >
-                         {loadingPriceId === 'manage' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Gerenciar Assinatura
-                    </Button>
-                </CardFooter>
-            </Card>
-        )
-    }
+  const handleLogout = async () => {
+    await signOut(auth);
+    router.replace('/login');
+  }
 
-    return (
+  if (loading) {
+     return (
+        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-secondary">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+    );
+  }
+
+  if (subscription?.isActive) {
+      return (
+            <Card className="w-full max-w-md">
+            <CardHeader>
+                <CardTitle>Sua assinatura está ativa!</CardTitle>
+                <CardDescription>
+                    Obrigado por fazer parte do ClinicStock. Use o botão abaixo para gerenciar sua assinatura.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                 <Button 
+                    className="w-full" 
+                    onClick={handleManageSubscription}
+                    disabled={loadingPriceId === 'manage'}
+                >
+                        {loadingPriceId === 'manage' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Gerenciar Assinatura
+                </Button>
+                 <Button 
+                    variant="outline"
+                    className="w-full" 
+                    onClick={() => router.push('/dashboard')}
+                >
+                    Voltar para o App
+                </Button>
+            </CardContent>
+        </Card>
+      )
+  }
+
+  return (
+    <>
+        <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold tracking-tight">Escolha o plano ideal para você</h1>
+            <p className="text-muted-foreground mt-2">Desbloqueie todo o potencial do ClinicStock.</p>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
             {plans.map(plan => (
                  <Card key={plan.name} className={plan.isFeatured ? 'border-primary' : ''}>
@@ -141,7 +168,7 @@ export default function SubscriptionModal() {
                          <Button 
                             className="w-full" 
                             onClick={() => handleCreateCheckout(plan.priceId)}
-                            disabled={!plan.priceId || !!loadingPriceId}
+                            disabled={!plan.priceId || !!loadingPriceId || !user}
                         >
                             {loadingPriceId === plan.priceId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {plan.isFeatured ? 'Assinar com Desconto' : 'Assinar Agora'}
@@ -150,16 +177,12 @@ export default function SubscriptionModal() {
                 </Card>
             ))}
         </div>
-    )
-  }
-
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-secondary p-4">
-        <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">Escolha o plano ideal para você</h1>
-            <p className="text-muted-foreground mt-2">Desbloqueie todo o potencial do ClinicStock.</p>
+        <div className="mt-8">
+            <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground">
+                <LogOut className="mr-2 h-4 w-4"/>
+                Sair
+            </Button>
         </div>
-        {renderContent()}
-    </div>
+    </>
   );
 }

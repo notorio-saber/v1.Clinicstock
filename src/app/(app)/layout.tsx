@@ -13,25 +13,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (loading) {
-      return; // Não faça nada enquanto carrega
+      return; // Wait until loading is complete
     }
 
     if (!user) {
-      // Se não há usuário, envie para o login
       router.replace('/login');
       return;
     }
-
-    if (!subscription?.isActive) {
-      // Se há usuário mas não há assinatura ativa, envie para a página de assinatura
+    
+    if (user && !subscription?.isActive) {
       router.replace('/subscription');
       return;
     }
 
-    // Se há usuário e assinatura ativa, pode usar o app
   }, [user, subscription, loading, router]);
 
 
+  // Show a loading screen while checking auth and subscription status
   if (loading || !user || !subscription?.isActive) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-secondary">
@@ -40,7 +38,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-
+  
+  // Render the app content if user and subscription are valid
   return (
     <div className="flex h-screen flex-col bg-secondary">
       <Header />
