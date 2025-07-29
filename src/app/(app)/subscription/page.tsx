@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Check, Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import useAuth from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
 
 const plans = [
     {
@@ -37,14 +38,57 @@ const plans = [
 
 export default function SubscriptionModal() {
   const { user, subscription } = useAuth();
+  const { toast } = useToast();
   const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
 
   const handleCreateCheckout = async (priceId: string) => {
-    // A ser implementado no próximo passo
+    if (!user) {
+        toast({ variant: 'destructive', title: 'Erro', description: 'Você precisa estar logado para assinar.' });
+        return;
+    }
+    setLoadingPriceId(priceId);
+    try {
+        const response = await fetch('/api/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ priceId: priceId, userId: user.uid }),
+        });
+
+        const { url } = await response.json();
+        if (url) {
+            window.location.href = url;
+        } else {
+            toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível iniciar o checkout. Tente novamente.' });
+        }
+
+    } catch (error) {
+        console.error("Error creating checkout session:", error);
+        toast({ variant: 'destructive', title: 'Erro', description: 'Ocorreu um erro inesperado.' });
+    } finally {
+        setLoadingPriceId(null);
+    }
   };
 
   const handleManageSubscription = async () => {
-    // A ser implementado no próximo passo
+    setLoadingPriceId('manage');
+    try {
+        const response = await fetch('/api/manage-subscription', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user?.uid }),
+        });
+        const { url } = await response.json();
+        if (url) {
+            window.location.href = url;
+        } else {
+             toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível gerenciar sua assinatura. Tente novamente.' });
+        }
+    } catch (error) {
+         console.error("Error creating portal link:", error);
+        toast({ variant: 'destructive', title: 'Erro', description: 'Ocorreu um erro inesperado.' });
+    } finally {
+        setLoadingPriceId(null);
+    }
   };
 
   const renderContent = () => {
