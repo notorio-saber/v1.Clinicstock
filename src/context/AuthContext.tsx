@@ -1,25 +1,6 @@
 'use client';
 
 import { useState, useEffect, createContext, ReactNode, useCallback } from 'react';
-import { onAuthStateChanged, User, getRedirectResult, signOut, GoogleAuthProvider } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
-import type { Subscription } from '@/lib/types';
-
-interface AuthContextType {
-  user: User | null;
-  subscription: { id: string; isActive: boolean } | null;
-  loading: boolean;
-  reloadUser: () => Promise<void>;
-  logout: () => Promise<void>;
-}
-
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = 'use client';
-
-import { useState, useEffect, createContext, ReactNode, useCallback } from 'react';
 import { onAuthStateChanged, User, getRedirectResult, signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -57,27 +38,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   },[router]);
 
    useEffect(() => {
-    // This is the core logic that handles auth state changes.
-    // It runs once on mount.
     setLoading(true);
     
-    // First, try to get the result of a potential redirect.
-    // This is crucial for Google/social logins.
     getRedirectResult(auth)
       .then((result) => {
         // If a result exists, onAuthStateChanged will handle the new user state.
-        // We don't need to do anything here, because the listener below will fire.
       })
       .catch((error) => {
         console.error("Auth: Error getting redirect result", error);
       })
       .finally(() => {
-         // Now, set up the onAuthStateChanged listener.
-         // This will run immediately with the current user, or when the user logs in/out.
         const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
           if (firebaseUser) {
             setUser(firebaseUser);
-            // User is signed in, check for their subscription.
             const subRef = collection(db, 'customers', firebaseUser.uid, 'subscriptions');
             const unsubscribeSub = onSnapshot(subRef, (snapshot) => {
               const activeSubscriptions = snapshot.docs
@@ -98,7 +71,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             
             return () => unsubscribeSub();
           } else {
-            // No user is signed in.
             setUser(null);
             setSubscription(null);
             setLoading(false);
