@@ -9,10 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import Link from 'next/link';
 import { auth } from '@/lib/firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 
 const formSchema = z.object({
@@ -20,7 +20,6 @@ const formSchema = z.object({
   password: z.string().min(6, { message: 'A senha deve ter pelo menos 6 caracteres.' }),
 });
 
-// A simple inline SVG for the Google icon
 const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="24px" height="24px" {...props}>
         <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
@@ -33,8 +32,8 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 export default function LoginPage() {
   const { toast } = useToast();
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingEmail, setIsLoadingEmail] = useState(false);
+  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -45,10 +44,9 @@ export default function LoginPage() {
   });
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
-    setIsLoading(true);
+    setIsLoadingEmail(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      // O useAuth hook cuidará do redirecionamento
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -56,25 +54,29 @@ export default function LoginPage() {
         description: 'As credenciais estão incorretas. Verifique seu e-mail e senha.',
       });
     } finally {
-        setIsLoading(false);
+        setIsLoadingEmail(false);
     }
   }
 
   async function handleGoogleSignIn() {
-    setIsLoading(true); // Re-utiliza o mesmo estado de loading
+    console.log("LoginPage: handleGoogleSignIn called.");
+    setIsLoadingGoogle(true); 
     const provider = new GoogleAuthProvider();
     try {
       await signInWithRedirect(auth, provider);
-      // O redirecionamento tratará do resto. O useAuth hook cuidará de capturar o resultado.
+      console.log("LoginPage: signInWithRedirect initiated.");
     } catch (error: any) {
+      console.error("LoginPage: Error during signInWithRedirect", error);
       toast({
         variant: 'destructive',
         title: 'Erro no Login com Google',
         description: 'Não foi possível iniciar o login com o Google. Tente novamente.',
       });
-       setIsLoading(false);
+       setIsLoadingGoogle(false);
     }
   }
+
+  const isLoading = isLoadingEmail || isLoadingGoogle;
 
   return (
       <Card>
@@ -112,7 +114,7 @@ export default function LoginPage() {
                 )}
               />
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isLoadingEmail && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Entrar
               </Button>
             </form>
@@ -130,7 +132,7 @@ export default function LoginPage() {
            </div>
 
             <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isLoading}>
-                 {isLoading ? (
+                 {isLoadingGoogle ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                  ) : (
                     <GoogleIcon className="mr-2 h-5 w-5" />
