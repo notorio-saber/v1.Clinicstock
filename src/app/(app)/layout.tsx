@@ -12,15 +12,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.replace('/login');
+    if (loading) {
+      return; // Não faça nada enquanto carrega
     }
-  }, [user, loading, router]);
 
-  useEffect(() => {
-    if (!loading && user && !subscription?.isActive) {
-        router.replace('/subscription');
+    if (!user) {
+      // Se não há usuário, envie para o login
+      router.replace('/login');
+      return;
     }
+
+    if (!subscription?.isActive) {
+      // Se há usuário mas não há assinatura ativa, envie para a página de assinatura
+      router.replace('/subscription');
+      return;
+    }
+
+    // Se há usuário e assinatura ativa, pode usar o app
   }, [user, subscription, loading, router]);
 
 
