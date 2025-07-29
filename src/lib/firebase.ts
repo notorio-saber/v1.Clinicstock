@@ -12,22 +12,15 @@ const firebaseConfig = {
   appId: "1:148870614912:web:be87f6b3b8ecb599c33b65"
 };
 
-// Initialize Firebase only on the client side
 let app: FirebaseApp;
-let auth: Auth;
-let db: Firestore;
-let storage: FirebaseStorage;
-
-if (typeof window !== 'undefined') {
-    if (!getApps().length) {
-        app = initializeApp(firebaseConfig);
-    } else {
-        app = getApp();
-    }
-    auth = getAuth(app);
-    db = getFirestore(app);
-    storage = getStorage(app);
+if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+} else {
+    app = getApp();
 }
 
-// @ts-ignore
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
 export { app, auth, db, storage };
