@@ -35,7 +35,6 @@ export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -49,11 +48,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
-      toast({
-        title: 'Login bem-sucedido!',
-        description: 'Redirecionando para o painel...',
-      });
-      router.push('/dashboard');
+      // O useAuth hook cuidará do redirecionamento
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -66,18 +61,18 @@ export default function LoginPage() {
   }
 
   async function handleGoogleSignIn() {
-    setIsGoogleLoading(true);
+    setIsLoading(true); // Re-utiliza o mesmo estado de loading
     const provider = new GoogleAuthProvider();
     try {
       await signInWithRedirect(auth, provider);
-      // O redirecionamento tratará do resto. A lógica para capturar o usuário está no useAuth.
+      // O redirecionamento tratará do resto. O useAuth hook cuidará de capturar o resultado.
     } catch (error: any) {
       toast({
         variant: 'destructive',
         title: 'Erro no Login com Google',
         description: 'Não foi possível iniciar o login com o Google. Tente novamente.',
       });
-       setIsGoogleLoading(false);
+       setIsLoading(false);
     }
   }
 
@@ -116,7 +111,7 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full" disabled={isLoading || isGoogleLoading}>
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Entrar
               </Button>
@@ -134,8 +129,8 @@ export default function LoginPage() {
             </div>
            </div>
 
-            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isGoogleLoading || isLoading}>
-                 {isGoogleLoading ? (
+            <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isLoading}>
+                 {isLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                  ) : (
                     <GoogleIcon className="mr-2 h-5 w-5" />
