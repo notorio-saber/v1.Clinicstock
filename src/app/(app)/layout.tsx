@@ -9,16 +9,33 @@ import { useEffect } from 'react';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, subscription, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (loading) return; // Wait for the auth state to be determined
+
+    if (!user) {
+      router.replace('/login');
+      return;
+    }
+
+    if (!subscription?.isActive) {
+      router.replace('/subscription');
+    }
+  }, [user, subscription, loading, router]);
   
+  // While loading, or if user is null and we are about to redirect, show a loader.
+  // Or if user is present but subscription isn't active and we are about to redirect.
   if (loading || !user || !subscription?.isActive) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-secondary">
         <Loader className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-muted-foreground">Verificando credenciais e assinatura...</p>
+        <p className="text-muted-foreground">Verificando credenciais...</p>
       </div>
     );
   }
   
+  // If user and active subscription are present, render the app layout
   return (
     <div className="flex h-screen flex-col bg-secondary">
       <Header />

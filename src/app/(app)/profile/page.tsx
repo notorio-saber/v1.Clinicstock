@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Save, Shield, LogOut, Loader2, Upload, CreditCard } from 'lucide-react';
 import useAuth from '@/hooks/useAuth';
-import { signOut, updateProfile, sendPasswordResetEmail } from 'firebase/auth';
+import { updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, storage } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -18,7 +18,7 @@ import Link from 'next/link';
 
 
 export default function ProfilePage() {
-  const { user, subscription, loading: authLoading, reloadUser } = useAuth();
+  const { user, subscription, loading: authLoading, reloadUser, logout } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -39,8 +39,7 @@ export default function ProfilePage() {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
-      router.push('/login');
+      await logout();
       toast({ title: 'Você saiu da sua conta.' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erro ao sair', description: 'Não foi possível fazer logout. Tente novamente.' });

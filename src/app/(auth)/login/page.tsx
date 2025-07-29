@@ -9,11 +9,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import Link from 'next/link';
 import { auth } from '@/lib/firebase';
-import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithRedirect } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
+import useAuth from '@/hooks/useAuth';
 
 const formSchema = z.object({
   email: z.string().email({ message: 'Por favor, insira um e-mail válido.' }),
@@ -31,10 +32,12 @@ const GoogleIcon = (props: React.SVGProps<SVGSVGElement>) => (
 
 
 export default function LoginPage() {
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
   const [isLoadingEmail, setIsLoadingEmail] = useState(false);
-  const [isLoadingGoogle, setIsLoadingGoogle] = useState(false);
-
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -42,11 +45,19 @@ export default function LoginPage() {
       password: '',
     },
   });
+  
+  useEffect(() => {
+    if (!authLoading && user) {
+        router.replace('/dashboard');
+    }
+  }, [user, authLoading, router]);
+
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoadingEmail(true);
     try {
       await signInWithEmailAndPassword(auth, values.email, values.password);
+      // The redirect is handled by the AuthProvider/useAuth hook
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -59,24 +70,31 @@ export default function LoginPage() {
   }
 
   async function handleGoogleSignIn() {
-    console.log("LoginPage: handleGoogleSignIn called.");
-    setIsLoadingGoogle(true); 
+    setIsGoogleLoading(true);
     const provider = new GoogleAuthProvider();
     try {
       await signInWithRedirect(auth, provider);
-      console.log("LoginPage: signInWithRedirect initiated.");
+      // The result is handled by the AuthProvider
     } catch (error: any) {
-      console.error("LoginPage: Error during signInWithRedirect", error);
       toast({
         variant: 'destructive',
         title: 'Erro no Login com Google',
         description: 'Não foi possível iniciar o login com o Google. Tente novamente.',
       });
-       setIsLoadingGoogle(false);
+      setIsGoogleLoading(false);
     }
   }
 
-  const isLoading = isLoadingEmail || isLoadingGoogle;
+  const isLoading = isLoadingEmail || isGoogleLoading;
+
+  if(authLoading || user) {
+    return (
+       <div className="flex h-64 w-full flex-col items-center justify-center gap-4 bg-secondary">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Verificando sessão...</p>
+      </div>
+    )
+  }
 
   return (
       <Card>
@@ -125,14 +143,14 @@ export default function LoginPage() {
                 <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
+                <span className="bg-card px-2 text-muted-foreground">
                 Ou continue com
                 </span>
             </div>
            </div>
 
             <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isLoading}>
-                 {isLoadingGoogle ? (
+                 {isGoogleLoading ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                  ) : (
                     <GoogleIcon className="mr-2 h-5 w-5" />

@@ -6,8 +6,6 @@ import { Check, Loader2, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import useAuth from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
 const plans = [
@@ -40,7 +38,7 @@ const plans = [
 ]
 
 export default function SubscriptionPage() {
-  const { user, subscription, loading } = useAuth();
+  const { user, subscription, loading, logout } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
   const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
@@ -95,11 +93,6 @@ export default function SubscriptionPage() {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    router.replace('/login');
-  }
-
   if (loading) {
      return (
         <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-secondary">
@@ -107,34 +100,28 @@ export default function SubscriptionPage() {
         </div>
     );
   }
-
+  
+  // This logic is important to redirect user if they land here by mistake
   if (subscription?.isActive) {
       return (
-            <Card className="w-full max-w-md">
-            <CardHeader>
-                <CardTitle>Sua assinatura está ativa!</CardTitle>
-                <CardDescription>
-                    Obrigado por fazer parte do ClinicStock. Use o botão abaixo para gerenciar sua assinatura.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                 <Button 
-                    className="w-full" 
-                    onClick={handleManageSubscription}
-                    disabled={loadingPriceId === 'manage'}
-                >
-                        {loadingPriceId === 'manage' && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Gerenciar Assinatura
-                </Button>
-                 <Button 
-                    variant="outline"
-                    className="w-full" 
-                    onClick={() => router.push('/dashboard')}
-                >
-                    Voltar para o App
-                </Button>
-            </CardContent>
-        </Card>
+        <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-secondary">
+             <Card className="w-full max-w-md">
+                <CardHeader>
+                    <CardTitle>Sua assinatura já está ativa!</CardTitle>
+                    <CardDescription>
+                        Você será redirecionado para o painel principal.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <Button 
+                        className="w-full" 
+                        onClick={() => router.push('/dashboard')}
+                    >
+                        Ir para o Dashboard
+                    </Button>
+                </CardContent>
+            </Card>
+        </div>
       )
   }
 
@@ -178,7 +165,7 @@ export default function SubscriptionPage() {
             ))}
         </div>
         <div className="mt-8">
-            <Button variant="ghost" onClick={handleLogout} className="text-muted-foreground">
+            <Button variant="ghost" onClick={logout} className="text-muted-foreground">
                 <LogOut className="mr-2 h-4 w-4"/>
                 Sair
             </Button>
