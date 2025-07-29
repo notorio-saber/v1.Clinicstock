@@ -7,6 +7,7 @@ export async function POST(req: Request) {
     const { userId, priceId } = await req.json();
 
     if (!userId || !priceId) {
+      console.error('POST /api/checkout - Error: Missing userId or priceId');
       return new NextResponse('Missing userId or priceId', { status: 400 });
     }
 
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
           const { error, url } = snap.data() as { error?: { message: string }; url?: string };
           if (error) {
             unsubscribe();
-            console.error(`An error occurred: ${error.message}`);
+            console.error(`An error occurred in checkout session snapshot: ${error.message}`);
             reject(new NextResponse(error.message, { status: 500 }));
           }
           if (url) {
@@ -35,20 +36,21 @@ export async function POST(req: Request) {
         },
         (err) => {
             unsubscribe();
-            console.error("onSnapshot error:", err);
-            reject(new NextResponse('Internal Server Error', { status: 500 }));
+            console.error("onSnapshot error in checkout API:", err);
+            reject(new NextResponse('Internal Server Error on snapshot listen', { status: 500 }));
         }
       );
 
        // Set a timeout to prevent the function from hanging indefinitely
         setTimeout(() => {
             unsubscribe();
+            console.error('POST /api/checkout - Error: Request timed out after 20 seconds.');
             reject(new NextResponse('Request timed out.', { status: 504 }));
         }, 20000); // 20 seconds timeout
     });
 
   } catch (error) {
-    console.error('POST /api/checkout error:', error);
+    console.error('POST /api/checkout - General catch block error:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
