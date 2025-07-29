@@ -23,45 +23,40 @@ export default function useAuth() {
   }
 
   useEffect(() => {
-    const processRedirectResult = async () => {
-        try {
-            const result = await getRedirectResult(auth);
-            if (result) {
-                // Usuário acabou de logar via redirect. O onAuthStateChanged vai lidar com o estado.
-                // Aqui você pode adicionar lógica específica se precisar dos dados do `result`
+    // This effect runs only once on mount to handle auth state.
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        if (currentUser) {
+            setUser(currentUser);
+        } else {
+            // This case happens on initial load when user is not logged in,
+            // or after sign-out.
+            try {
+                // Check if we are returning from a Google Sign-in redirect
+                const result = await getRedirectResult(auth);
+                if (result) {
+                    // This will trigger onAuthStateChanged again with the new user
+                    // No need to setLoading(false) here, the next cycle will handle it
+                    return; 
+                }
+            } catch (error) {
+                console.error("Error getting redirect result:", error);
             }
-        } catch (error) {
-            console.error("Erro ao obter resultado do redirecionamento:", error);
-        } finally {
-            // Após processar o redirect, a lógica principal pode continuar
-             const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
-              if (currentUser) {
-                setUser(currentUser);
-              } else {
-                setUser(null);
-                setSubscription(null);
-                setLoading(false);
-              }
-            });
-            // O unsubscribe será chamado no retorno do useEffect principal
-            return unsubscribeAuth;
+            // If no user and no redirect result, they are truly logged out.
+            setUser(null);
+            setSubscription(null);
+            setLoading(false);
         }
-    };
-    
-    const unsubscribePromise = processRedirectResult();
+    });
 
-    return () => {
-        unsubscribePromise.then(unsubscribe => {
-            if (unsubscribe) {
-                unsubscribe();
-            }
-        });
-    };
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
+    // This effect handles subscription state once we have a user.
     if (!user) {
-        setLoading(false);
+        // If user becomes null (logout), we stop loading.
+        // The redirection logic will handle sending them to /login
+        if (!loading) setLoading(false);
         return;
     };
 
@@ -83,30 +78,34 @@ export default function useAuth() {
       } else {
         setSubscription({ id: '', isActive: false });
       }
-      setLoading(false);
+      setLoading(false); // We have the user and their sub status, stop loading.
     }, (error) => {
         console.error("Erro ao buscar assinatura:", error);
+        setSubscription({ id: '', isActive: false });
         setLoading(false);
     });
 
     return () => {
       unsubscribeSubscriptions();
     };
-  }, [user]);
+  }, [user, loading]);
 
 
   useEffect(() => {
+    // This effect handles all redirection logic once loading is false.
     const isAuthPage = pathname.startsWith('/login') || pathname.startsWith('/signup');
     const isSubscriptionPage = pathname.startsWith('/subscription');
 
-    if (loading) return; // Não faça nada enquanto carrega
+    if (loading) return; // Do nothing while loading.
 
     if (!user && !isAuthPage) {
         router.replace('/login');
-    } else if (user && !subscription?.isActive && !isSubscriptionPage) {
-        router.replace('/subscription');
-    } else if (user && subscription?.isActive && (isAuthPage || isSubscriptionPage)) {
-        router.replace('/dashboard');
+    } else if (user) {
+        if (!subscription?.isActive && !isSubscriptionPage) {
+             router.replace('/subscription');
+        } else if (subscription?.isActive && (isAuthPage || isSubscriptionPage)) {
+             router.replace('/dashboard');
+        }
     }
   }, [user, subscription, loading, router, pathname]);
 
