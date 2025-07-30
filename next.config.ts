@@ -1,3 +1,4 @@
+
 import type { NextConfig } from 'next';
 
 const config: NextConfig = {
@@ -25,6 +26,10 @@ const config: NextConfig = {
       'https://*.cloudworkstations.dev',
       'https://*.firebase.studio',
     ],
+  },
+  experimental: {
+    // Adicionado para resolver problemas de resolução de módulos no servidor
+    serverComponentsExternalPackages: ['stripe'],
   },
 };
 
