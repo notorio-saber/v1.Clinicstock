@@ -27,10 +27,9 @@ const config: NextConfig = {
       'https://*.firebase.studio',
     ],
   },
-  experimental: {
-    // Adicionado para resolver problemas de resolução de módulos no servidor
-    serverComponentsExternalPackages: ['stripe'],
-  },
+  serverExternalPackages: ['stripe'],
 };
 
 export default config;
+
+    
