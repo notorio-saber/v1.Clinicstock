@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, doc } from 'firebase/firestore';
+import { Stripe } from 'stripe';
+
+// Initialize Stripe with the secret key
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+  apiVersion: '2024-06-20',
+});
+
 
 export async function POST(req: Request) {
   try {
@@ -11,46 +18,34 @@ export async function POST(req: Request) {
       return new NextResponse('Missing userId or priceId', { status: 400 });
     }
 
-    const checkoutSessionRef = collection(db, 'customers', userId, 'checkout_sessions');
-
-    const newSessionDoc = await addDoc(checkoutSessionRef, {
-      price: priceId,
-      success_url: `${req.headers.get('origin')}/dashboard`,
-      cancel_url: `${req.headers.get('origin')}/subscription`,
-    });
-
-    return new Promise<NextResponse>((resolve, reject) => {
-      const unsubscribe = onSnapshot(
-        doc(db, 'customers', userId, 'checkout_sessions', newSessionDoc.id),
-        (snap) => {
-          const { error, url } = snap.data() as { error?: { message: string }; url?: string };
-          if (error) {
-            unsubscribe();
-            console.error(`An error occurred in checkout session snapshot: ${error.message}`);
-            reject(new NextResponse(error.message, { status: 500 }));
-          }
-          if (url) {
-            unsubscribe();
-            resolve(NextResponse.json({ url }));
-          }
+    // This is the correct way to create a checkout session with the Stripe Node.js library.
+    // The previous implementation was only creating a document in Firestore, not actually calling Stripe.
+    const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+            {
+                price: priceId,
+                quantity: 1,
+            },
+        ],
+        mode: 'subscription',
+        success_url: `${req.headers.get('origin')}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.headers.get('origin')}/subscription`,
+        metadata: {
+            userId: userId,
         },
-        (err) => {
-            unsubscribe();
-            console.error("onSnapshot error in checkout API:", err);
-            reject(new NextResponse('Internal Server Error on snapshot listen', { status: 500 }));
-        }
-      );
-
-       // Set a timeout to prevent the function from hanging indefinitely
-        setTimeout(() => {
-            unsubscribe();
-            console.error('POST /api/checkout - Error: Request timed out after 20 seconds.');
-            reject(new NextResponse('Request timed out.', { status: 504 }));
-        }, 20000); // 20 seconds timeout
+        customer_email: (await db.collection('customers').doc(userId).get()).data()?.email, // Pre-fill email
     });
+    
+    if (session.url) {
+      return NextResponse.json({ url: session.url });
+    } else {
+      return new NextResponse('Failed to create Stripe checkout session', { status: 500 });
+    }
 
   } catch (error) {
     console.error('POST /api/checkout - General catch block error:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Internal Server Error';
+    return new NextResponse(errorMessage, { status: 500 });
   }
 }
