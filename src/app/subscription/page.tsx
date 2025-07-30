@@ -8,12 +8,13 @@ import useAuth from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
+// Hardcoded Price IDs as a temporary solution
 const plans = [
     {
         name: 'Plano Mensal',
         price: 'R$ 39,90',
         period: '/mês',
-        priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_MONTHLY || '',
+        priceId: 'price_1PgRUnRuaD3I4J794hYfG2fB', // Hardcoded ID
         features: [
             'Gerenciamento de Produtos',
             'Controle de Estoque e Validade',
@@ -26,7 +27,7 @@ const plans = [
         name: 'Plano Anual',
         price: 'R$ 399',
         period: '/ano',
-        priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_YEARLY || '',
+        priceId: 'price_1PgRUnRuaD3I4J7973yO7pE7', // Hardcoded ID
         features: [
            'Todos os benefícios do plano mensal',
            '2 meses de desconto',
