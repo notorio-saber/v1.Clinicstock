@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, onSnapshot, doc } from 'firebase/firestore';
+require('dotenv').config();
 
 // This is the URL of our deployed Firebase Function.
 // It is created by the "Stripe Customer Portal" Firebase Extension.
