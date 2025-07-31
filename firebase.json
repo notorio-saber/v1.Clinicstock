@@ -6,7 +6,8 @@
       "**/.*",
       "**/node_modules/**"
     ],
-    "frameworksBackend": {},
-    "predeploy": []
+    "frameworksBackend": {
+      "region": "us-central1"
+    }
   }
 }
