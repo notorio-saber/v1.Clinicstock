@@ -52,14 +52,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(firebaseUser);
           // Now that we have a user, listen for subscription changes.
           const subRef = collection(db, 'customers', firebaseUser.uid, 'subscriptions');
-          const q = query(subRef, where("status", "in", ["trialing", "active"]));
+          // Simplificando a query para ser mais robusta.
+          const q = query(subRef);
 
           const unsubscribeSub = onSnapshot(q, (snapshot) => {
             if (snapshot.empty) {
               setSubscription({ id: '', isActive: false });
             } else {
-              const sub = snapshot.docs[0].data() as Subscription;
-              setSubscription({ id: snapshot.docs[0].id, isActive: true });
+              // Pega a primeira assinatura encontrada e verifica o status dela.
+              const subDoc = snapshot.docs[0];
+              const sub = subDoc.data() as Subscription;
+              const activeStatuses = ["trialing", "active"];
+              const isActive = activeStatuses.includes(sub.status);
+              setSubscription({ id: subDoc.id, isActive });
             }
             setLoading(false); // Done loading after getting sub status
           }, (error) => {
