@@ -5,6 +5,3 @@ runConfig:
   # Increase this value if you'd like to automatically spin up
   # more instances in response to increased traffic.
   maxInstances: 1
-  # Grant the backend access to the STRIPE_SECRET_KEY secret.
-  secrets:
-    - secret: STRIPE_SECRET_KEY
