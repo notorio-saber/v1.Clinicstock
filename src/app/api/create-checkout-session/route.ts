@@ -17,36 +17,51 @@ export async function POST(req: Request) {
   try {
     const {userId, priceId} = await req.json();
 
-    if (!userId) {
-      return new NextResponse('Missing userId', {status: 400});
-    }
-    if (!priceId) {
-      return new NextResponse('Missing priceId', {status: 400});
+    // 1. Validate input parameters
+    if (!userId || !priceId) {
+      return NextResponse.json(
+        {message: 'Missing required parameters: userId and priceId.'},
+        {status: 400}
+      );
     }
 
     const headersList = headers();
     const origin = headersList.get('origin') || 'http://localhost:3000';
 
-    // Step 1: Check if we have a Stripe customer ID stored for this user
     const userDocRef = doc(db, 'users', userId);
     const userDocSnap = await getDoc(userDocRef);
+
+    // 2. Check if user exists in Firestore
+    if (!userDocSnap.exists()) {
+      return NextResponse.json(
+        {message: 'User not found in Firestore.'},
+        {status: 404}
+      );
+    }
+
     const userData = userDocSnap.data();
     let customerId: string | undefined = userData?.stripeCustomerId;
 
-    // Step 2: If no customer ID exists, create one and store it
+    // 3. Find or create a Stripe Customer
     if (!customerId) {
-      const customer = await stripe.customers.create({
-        email: userData?.email, // Pass user's email, which is crucial
-        metadata: {
-          firebaseUID: userId,
-        },
-      });
-      customerId = customer.id;
-      // Store the new customer ID in Firestore
-      await setDoc(userDocRef, {stripeCustomerId: customerId}, {merge: true});
+      try {
+        const customer = await stripe.customers.create({
+          email: userData?.email, // Pass user's email, which is crucial
+          metadata: {
+            firebaseUID: userId,
+          },
+        });
+        customerId = customer.id;
+        // Store the new customer ID in Firestore
+        await setDoc(userDocRef, {stripeCustomerId: customerId}, {merge: true});
+      } catch (customerError) {
+         console.error('Stripe customer creation error:', customerError);
+         const errorMessage = customerError instanceof Error ? customerError.message : 'Failed to create Stripe customer.';
+         return NextResponse.json({ message: errorMessage }, { status: 500 });
+      }
     }
 
-    // Step 3: Create a Checkout session
+    // 4. Create a Checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'subscription',
@@ -62,17 +77,19 @@ export async function POST(req: Request) {
       cancel_url: `${origin}/subscription`,
     });
 
-    // Step 4: Return the session ID
+    // 5. Return the session URL
     if (session.url) {
-        return NextResponse.json({ url: session.url });
+      return NextResponse.json({url: session.url});
     } else {
-        return new NextResponse('Failed to create a checkout session.', {status: 500});
+      return NextResponse.json(
+        {message: 'Failed to create a checkout session.'},
+        {status: 500}
+      );
     }
-
   } catch (error) {
     console.error('Stripe checkout session error:', error);
     const errorMessage =
       error instanceof Error ? error.message : 'Internal server error';
-    return new NextResponse(errorMessage, {status: 500});
+    return NextResponse.json({message: errorMessage}, {status: 500});
   }
 }
