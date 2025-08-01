@@ -38,44 +38,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   },[router]);
 
   useEffect(() => {
+    // It's important to handle the redirect result first in case of Google Sign-in.
     const processAuth = async () => {
-      // It's important to handle the redirect result first.
       try {
         await getRedirectResult(auth);
       } catch (error) {
         console.error("Auth: Error getting redirect result", error);
       }
 
+      // Main auth state listener
       const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-        setLoading(true); // Set loading true whenever auth state changes
+        setLoading(true); // Always start loading when auth state might change
         if (firebaseUser) {
           setUser(firebaseUser);
-          // Now that we have a user, listen for subscription changes.
+          
+          // Now that we have a user, listen for subscription changes in the `customers` collection.
           const subRef = collection(db, 'customers', firebaseUser.uid, 'subscriptions');
-          // Simplificando a query para ser mais robusta.
           const q = query(subRef);
 
           const unsubscribeSub = onSnapshot(q, (snapshot) => {
             if (snapshot.empty) {
               setSubscription({ id: '', isActive: false });
             } else {
-              // Pega a primeira assinatura encontrada e verifica o status dela.
+              // Get the first subscription document.
               const subDoc = snapshot.docs[0];
               const sub = subDoc.data() as Subscription;
+              
+              // Define what statuses we consider as "active".
               const activeStatuses = ["trialing", "active"];
               const isActive = activeStatuses.includes(sub.status);
+              
               setSubscription({ id: subDoc.id, isActive });
             }
-            setLoading(false); // Done loading after getting sub status
+            setLoading(false); // Done loading after getting subscription status
           }, (error) => {
-            console.error("Auth: Error fetching subscription", error);
-            // This is critical: if we have a permissions error, we must assume no subscription
-            // and stop loading so the UI can react.
+            console.error("Auth: Error fetching subscription. This is often a permissions issue.", error);
+            // If we have an error (e.g., permission denied), assume no active subscription.
+            // This is a critical fallback to prevent users from getting stuck.
             setSubscription({ id: '', isActive: false });
             setLoading(false);
           });
           
-          return () => unsubscribeSub(); // Cleanup subscription listener
+          // Return the cleanup function for the subscription listener.
+          return () => unsubscribeSub();
         } else {
           // No user is signed in.
           setUser(null);
@@ -84,7 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
 
-      return () => unsubscribe(); // Cleanup auth state listener
+      // Return the cleanup function for the auth state listener.
+      return () => unsubscribe();
     };
 
     processAuth();

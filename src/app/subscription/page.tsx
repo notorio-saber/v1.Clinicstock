@@ -102,7 +102,7 @@ export default function SubscriptionPage() {
                 <CardHeader>
                     <CardTitle>Sua assinatura já está ativa!</CardTitle>
                     <CardDescription>
-                        Redirecionando para o painel principal...
+                        Você pode gerenciar sua assinatura na sua página de perfil. Redirecionando para o painel...
                     </CardDescription>
                 </CardHeader>
                 <CardContent>

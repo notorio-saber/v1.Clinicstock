@@ -11,21 +11,18 @@ import useAuth from '@/hooks/useAuth';
 import { updateProfile, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, storage } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { useRouter } from 'next/navigation';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Skeleton } from '@/components/ui/skeleton';
-import Link from 'next/link';
-
 
 export default function ProfilePage() {
   const { user, subscription, loading: authLoading, reloadUser, logout } = useAuth();
   const { toast } = useToast();
-  const router = useRouter();
 
   const [displayName, setDisplayName] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isManagingSub, setIsManagingSub] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isPasswordProvider = user?.providerData.some(p => p.providerId === 'password');
@@ -36,7 +33,7 @@ export default function ProfilePage() {
     if (user) {
         reloadUser();
     }
-  }, []); // Run only once on component mount
+  }, [reloadUser, user]);
 
   useEffect(() => {
     if (user) {
@@ -51,6 +48,36 @@ export default function ProfilePage() {
       toast({ title: 'Você saiu da sua conta.' });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erro ao sair', description: 'Não foi possível fazer logout. Tente novamente.' });
+    }
+  };
+  
+  const handleManageSubscription = async () => {
+    if (!user) return;
+    setIsManagingSub(true);
+    try {
+        const response = await fetch('/api/manage-subscription', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.uid }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to create portal link.');
+        }
+
+        const { url } = await response.json();
+        if (url) {
+            window.location.href = url;
+        } else {
+             toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível obter o link para gerenciar sua assinatura.' });
+        }
+    } catch (error) {
+        console.error("Error creating portal link:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
+        toast({ variant: 'destructive', title: 'Erro ao Gerenciar Assinatura', description: errorMessage });
+    } finally {
+        setIsManagingSub(false);
     }
   };
 
@@ -205,17 +232,22 @@ export default function ProfilePage() {
             <CardTitle>Assinatura</CardTitle>
             <CardDescription>
                 {subscription?.isActive 
-                    ? `Seu plano está ativo.` 
+                    ? `Seu plano está ativo. ` 
                     : 'Você não tem uma assinatura ativa. Escolha um plano para continuar.'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Link href="/subscription" passHref>
-                <Button variant="outline" className="w-full">
-                    <CreditCard className="mr-2 h-4 w-4"/>
+            {subscription?.isActive ? (
+                 <Button variant="outline" className="w-full" onClick={handleManageSubscription} disabled={isManagingSub}>
+                    {isManagingSub ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CreditCard className="mr-2 h-4 w-4"/>}
                     Gerenciar Assinatura
                 </Button>
-            </Link>
+            ) : (
+                 <Button variant="default" className="w-full" onClick={() => router.push('/subscription')}>
+                    <CreditCard className="mr-2 h-4 w-4"/>
+                    Ver Planos
+                </Button>
+            )}
           </CardContent>
         </Card>
 
