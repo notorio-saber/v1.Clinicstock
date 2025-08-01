@@ -53,7 +53,9 @@ export default function SubscriptionPage() {
         return;
     }
     setIsRedirecting(link);
-    window.location.href = link;
+    // Adiciona o client_reference_id para que o webhook do Stripe saiba qual usuário do Firebase atualizar.
+    const urlWithUser = `${link}?client_reference_id=${user.uid}&prefilled_email=${encodeURIComponent(user.email || '')}`;
+    window.location.href = urlWithUser;
   };
 
   const handleManageSubscription = async () => {
