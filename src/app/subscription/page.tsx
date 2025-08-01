@@ -45,7 +45,7 @@ export default function SubscriptionPage() {
   const [isRedirecting, setIsRedirecting] = useState<string | null>(null);
 
   const handleRedirectToCheckout = async (priceId: string) => {
-    if (!user) {
+    if (!user || !user.email) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Você precisa estar logado para assinar.' });
         return;
     }
@@ -60,7 +60,7 @@ export default function SubscriptionPage() {
         const response = await fetch('/api/create-checkout-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.uid, priceId }),
+            body: JSON.stringify({ userId: user.uid, userEmail: user.email, priceId }),
         });
 
         if (!response.ok) {

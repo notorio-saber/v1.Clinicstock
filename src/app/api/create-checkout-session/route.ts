@@ -3,8 +3,8 @@
 
 import {NextResponse} from 'next/server';
 import {headers} from 'next/headers';
-import { adminDb } from '@/lib/firebase-admin';
 import Stripe from 'stripe';
+import { adminDb } from '@/lib/firebase-admin';
 
 // Initialize Stripe with the secret key
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
@@ -14,12 +14,12 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
 // This function handles POST requests to create a Stripe Checkout session
 export async function POST(req: Request) {
   try {
-    const {userId, priceId} = await req.json();
+    const {userId, userEmail, priceId} = await req.json();
 
     // 1. Validate input parameters
-    if (!userId || !priceId) {
+    if (!userId || !priceId || !userEmail) {
       return NextResponse.json(
-        {message: 'Missing required parameters: userId and priceId.'},
+        {message: 'Missing required parameters: userId, userEmail, and priceId.'},
         {status: 400}
       );
     }
@@ -30,37 +30,37 @@ export async function POST(req: Request) {
     const userDocRef = adminDb.collection('users').doc(userId);
     const userDocSnap = await userDocRef.get();
 
-    // 2. Check if user exists in Firestore
-    if (!userDocSnap.exists) {
-      return NextResponse.json(
-        {message: 'User not found in Firestore.'},
-        {status: 404}
-      );
+    let customerId: string | undefined;
+
+    if (userDocSnap.exists) {
+        customerId = userDocSnap.data()?.stripeCustomerId;
     }
 
-    const userData = userDocSnap.data();
-    let customerId: string | undefined = userData?.stripeCustomerId;
-
-    // 3. Find or create a Stripe Customer
+    // 2. Find or create a Stripe Customer
     if (!customerId) {
       try {
-        const customer = await stripe.customers.create({
-          email: userData?.email, // Pass user's email, which is crucial
-          metadata: {
-            firebaseUID: userId,
-          },
-        });
-        customerId = customer.id;
+        const existingCustomers = await stripe.customers.list({ email: userEmail, limit: 1 });
+        if (existingCustomers.data.length > 0) {
+            customerId = existingCustomers.data[0].id;
+        } else {
+            const customer = await stripe.customers.create({
+              email: userEmail,
+              metadata: {
+                firebaseUID: userId,
+              },
+            });
+            customerId = customer.id;
+        }
         // Store the new customer ID in Firestore
         await userDocRef.set({stripeCustomerId: customerId}, {merge: true});
       } catch (customerError) {
-         console.error('Stripe customer creation error:', customerError);
-         const errorMessage = customerError instanceof Error ? customerError.message : 'Failed to create Stripe customer.';
+         console.error('Stripe customer creation/retrieval error:', customerError);
+         const errorMessage = customerError instanceof Error ? customerError.message : 'Failed to create/retrieve Stripe customer.';
          return NextResponse.json({ message: errorMessage }, { status: 500 });
       }
     }
 
-    // 4. Create a Checkout session
+    // 3. Create a Checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       mode: 'subscription',
@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       cancel_url: `${origin}/subscription`,
     });
 
-    // 5. Return the session URL
+    // 4. Return the session URL
     if (session.url) {
       return NextResponse.json({url: session.url});
     } else {
