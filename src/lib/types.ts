@@ -40,6 +40,7 @@ export type StockMovement = {
 
 export interface Subscription {
   id: string;
+  stripeCustomerId?: string;
   status: 'active' | 'trialing' | 'past_due' | 'canceled' | 'incomplete' | 'incomplete_expired' | 'unpaid';
   current_period_end: { seconds: number; nanoseconds: number; };
   // Adicione outros campos conforme a sincronização da extensão do Stripe

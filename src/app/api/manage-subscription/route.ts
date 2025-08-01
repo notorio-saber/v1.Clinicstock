@@ -1,14 +1,18 @@
+
 'use server';
 
 import {NextResponse} from 'next/server';
+import {headers} from 'next/headers';
 import {db} from '@/lib/firebase';
-import {collection, addDoc, onSnapshot, doc} from 'firebase/firestore';
+import {doc, getDoc} from 'firebase/firestore';
+import Stripe from 'stripe';
 
-// This is a placeholder URL. In a real project, this would be the URL
-// of the deployed Firebase Function provided by the "Stripe Customer Portal" Firebase Extension.
-// Since the extension seems to not be working, we are creating a more direct integration.
-const CUSTOMER_PORTAL_URL = 'https://example.com/stripe-portal'; // This will be replaced by Stripe's actual portal link logic.
+// Initialize Stripe with the secret key
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+  apiVersion: '2024-06-20',
+});
 
+// This function handles POST requests to create a Stripe Customer Portal session
 export async function POST(req: Request) {
   try {
     const {userId} = await req.json();
@@ -17,51 +21,48 @@ export async function POST(req: Request) {
       return new NextResponse('Missing userId', {status: 400});
     }
 
-    // This logic relies on the Stripe Firebase Extension creating portal_links.
-    // When a document is added to this collection, the extension generates a short-lived
-    // URL to the Stripe Customer Portal.
-    const portalLinksRef = collection(db, 'customers', userId, 'portal_links');
+    const headersList = headers();
+    const origin = headersList.get('origin');
 
-    const newPortalDoc = await addDoc(portalLinksRef, {
-      return_url: `${req.headers.get('origin')}/profile`,
+    // Default return URL if the user exits the portal
+    const returnUrl = `${origin}/profile`;
+
+    // Step 1: Check if we have a Stripe customer ID stored in Firestore
+    const userDocRef = doc(db, 'users', userId);
+    const userDocSnap = await getDoc(userDocRef);
+
+    let customerId: string | undefined = userDocSnap.data()?.stripeCustomerId;
+
+    // Step 2: If no customer ID exists, create a new customer in Stripe
+    if (!customerId) {
+        // This is a fallback. The customer ID should ideally be created and stored
+        // via a webhook when the first subscription is created. Since webhooks are
+        // not working, we won't have a customerId. For this flow to work, the user
+        // must have completed a checkout session, which creates a customer.
+        // We cannot create a portal session without a customer ID.
+        return new NextResponse(
+            'Stripe customer ID not found for this user. Please complete a subscription first.',
+            { status: 404 }
+        );
+    }
+
+    // Step 3: Create a Customer Portal session
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: returnUrl,
     });
 
-    // We listen for the extension to write the URL back to the document.
-    return new Promise<NextResponse>((resolve, reject) => {
-      const unsubscribe = onSnapshot(
-        doc(db, 'customers', userId, 'portal_links', newPortalDoc.id),
-        snap => {
-          const {error, url} = snap.data() as {
-            error?: {message: string};
-            url?: string;
-          };
-          if (error) {
-            unsubscribe();
-            console.error(
-              `An error occurred while creating the portal link: ${error.message}`
-            );
-            reject(new NextResponse(error.message, {status: 500}));
-          }
-          if (url) {
-            unsubscribe();
-            resolve(NextResponse.json({url}));
-          }
-        },
-        err => {
-          unsubscribe();
-          console.error('onSnapshot error:', err);
-          reject(new NextResponse('Internal Server Error', {status: 500}));
-        }
-      );
-
-      // Add a timeout to prevent the request from hanging indefinitely if the extension fails.
-      setTimeout(() => {
-        unsubscribe();
-        reject(new NextResponse('Request timed out.', {status: 504}));
-      }, 20000); // 20 seconds timeout
-    });
+    // Step 4: Return the URL of the portal session
+    if (portalSession.url) {
+      return NextResponse.json({url: portalSession.url});
+    } else {
+      return new NextResponse('Failed to create a portal session.', {
+        status: 500,
+      });
+    }
   } catch (error) {
-    console.error('POST /api/manage-subscription error:', error);
-    return new NextResponse('Internal Server Error', {status: 500});
+    console.error('Stripe portal session error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    return new NextResponse(errorMessage, {status: 500});
   }
 }

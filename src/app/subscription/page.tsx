@@ -13,7 +13,8 @@ const plans = [
         name: 'Plano Mensal',
         price: 'R$ 39,90',
         period: '/mês',
-        paymentLink: 'https://buy.stripe.com/test_28E5kEgGq6mf1qu24Jgw000',
+        // O ID do preço é necessário para a sessão de checkout
+        priceId: 'price_1PgWiyRVEaHkOD4JituKk9aO', // Substitua pelo seu Price ID real
         features: [
             'Gerenciamento de Produtos',
             'Controle de Estoque e Validade',
@@ -26,7 +27,7 @@ const plans = [
         name: 'Plano Anual',
         price: 'R$ 399',
         period: '/ano',
-        paymentLink: 'https://buy.stripe.com/test_3cI6oIfCm6mf4CG6kZgw001', 
+        priceId: 'price_1PgWjMRVEaHkOD4Jp0pT6R5I', // Substitua pelo seu Price ID real
         features: [
            'Todos os benefícios do plano mensal',
            '2 meses de desconto',
@@ -43,39 +44,40 @@ export default function SubscriptionPage() {
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState<string | null>(null);
 
-  const handleRedirectToCheckout = (link: string) => {
+  const handleRedirectToCheckout = async (priceId: string) => {
     if (!user) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Você precisa estar logado para assinar.' });
         return;
     }
-    if (!link || !link.startsWith('https://buy.stripe.com/')) {
-        toast({ variant: 'destructive', title: 'Erro de Configuração', description: 'O link de pagamento não está configurado corretamente.' });
+     if (!priceId) {
+        toast({ variant: 'destructive', title: 'Erro de Configuração', description: 'O ID do plano não está configurado.' });
         return;
     }
-    setIsRedirecting(link);
-    // Adiciona o client_reference_id para que o webhook do Stripe saiba qual usuário do Firebase atualizar.
-    const urlWithUser = `${link}?client_reference_id=${user.uid}&prefilled_email=${encodeURIComponent(user.email || '')}`;
-    window.location.href = urlWithUser;
-  };
 
-  const handleManageSubscription = async () => {
-    setIsRedirecting('manage');
+    setIsRedirecting(priceId);
+
     try {
-        const response = await fetch('/api/manage-subscription', {
+        const response = await fetch('/api/create-checkout-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user?.uid }),
+            body: JSON.stringify({ userId: user.uid, priceId }),
         });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.message || 'Failed to create checkout session.');
+        }
+
         const { url } = await response.json();
         if (url) {
             window.location.href = url;
         } else {
-             toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível gerenciar sua assinatura. Tente novamente.' });
+            toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível iniciar o checkout.' });
         }
     } catch (error) {
-         console.error("Error creating portal link:", error);
-        toast({ variant: 'destructive', title: 'Erro', description: 'Ocorreu um erro inesperado.' });
-    } finally {
+        console.error("Error creating checkout session:", error);
+        const errorMessage = error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
+        toast({ variant: 'destructive', title: 'Erro no Checkout', description: errorMessage });
         setIsRedirecting(null);
     }
   };
@@ -89,7 +91,6 @@ export default function SubscriptionPage() {
   }
   
   if (subscription?.isActive) {
-      // This timeout gives a moment for the main layout to redirect
       setTimeout(() => {
         if (window.location.pathname === '/subscription') {
             router.push('/dashboard');
@@ -142,10 +143,10 @@ export default function SubscriptionPage() {
                     <CardFooter>
                          <Button 
                             className="w-full" 
-                            onClick={() => handleRedirectToCheckout(plan.paymentLink)}
+                            onClick={() => handleRedirectToCheckout(plan.priceId)}
                             disabled={!!isRedirecting || !user}
                         >
-                            {isRedirecting === plan.paymentLink && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isRedirecting === plan.priceId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {plan.isFeatured ? 'Assinar com Desconto' : 'Assinar Agora'}
                         </Button>
                     </CardFooter>

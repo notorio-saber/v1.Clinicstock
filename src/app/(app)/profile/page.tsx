@@ -13,10 +13,12 @@ import { auth, storage } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useRouter } from 'next/navigation';
 
 export default function ProfilePage() {
   const { user, subscription, loading: authLoading, reloadUser, logout } = useAuth();
   const { toast } = useToast();
+  const router = useRouter();
 
   const [displayName, setDisplayName] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
