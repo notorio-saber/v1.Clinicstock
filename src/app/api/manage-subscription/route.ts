@@ -3,8 +3,7 @@
 
 import {NextResponse} from 'next/server';
 import {headers} from 'next/headers';
-import {db} from '@/lib/firebase';
-import {doc, getDoc} from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase-admin';
 import Stripe from 'stripe';
 
 // Initialize Stripe with the secret key
@@ -22,24 +21,23 @@ export async function POST(req: Request) {
     }
 
     const headersList = headers();
-    const origin = headersList.get('origin');
+    const origin = headersList.get('origin') || 'http://localhost:3000';
 
     // Default return URL if the user exits the portal
     const returnUrl = `${origin}/profile`;
 
     // Step 1: Check if we have a Stripe customer ID stored in Firestore
-    const userDocRef = doc(db, 'users', userId);
-    const userDocSnap = await getDoc(userDocRef);
+    const userDocRef = adminDb.collection('users').doc(userId);
+    const userDocSnap = await userDocRef.get();
+
+    if (!userDocSnap.exists) {
+        return new NextResponse('User not found.', { status: 404 });
+    }
 
     let customerId: string | undefined = userDocSnap.data()?.stripeCustomerId;
 
-    // Step 2: If no customer ID exists, create a new customer in Stripe
+    // Step 2: If no customer ID exists, we can't create a portal session.
     if (!customerId) {
-        // This is a fallback. The customer ID should ideally be created and stored
-        // via a webhook when the first subscription is created. Since webhooks are
-        // not working, we won't have a customerId. For this flow to work, the user
-        // must have completed a checkout session, which creates a customer.
-        // We cannot create a portal session without a customer ID.
         return new NextResponse(
             'Stripe customer ID not found for this user. Please complete a subscription first.',
             { status: 404 }

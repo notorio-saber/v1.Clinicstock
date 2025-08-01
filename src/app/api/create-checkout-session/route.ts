@@ -3,8 +3,7 @@
 
 import {NextResponse} from 'next/server';
 import {headers} from 'next/headers';
-import {db} from '@/lib/firebase';
-import {doc, getDoc, setDoc} from 'firebase/firestore';
+import { adminDb } from '@/lib/firebase-admin';
 import Stripe from 'stripe';
 
 // Initialize Stripe with the secret key
@@ -28,11 +27,11 @@ export async function POST(req: Request) {
     const headersList = headers();
     const origin = headersList.get('origin') || 'http://localhost:3000';
 
-    const userDocRef = doc(db, 'users', userId);
-    const userDocSnap = await getDoc(userDocRef);
+    const userDocRef = adminDb.collection('users').doc(userId);
+    const userDocSnap = await userDocRef.get();
 
     // 2. Check if user exists in Firestore
-    if (!userDocSnap.exists()) {
+    if (!userDocSnap.exists) {
       return NextResponse.json(
         {message: 'User not found in Firestore.'},
         {status: 404}
@@ -53,7 +52,7 @@ export async function POST(req: Request) {
         });
         customerId = customer.id;
         // Store the new customer ID in Firestore
-        await setDoc(userDocRef, {stripeCustomerId: customerId}, {merge: true});
+        await userDocRef.set({stripeCustomerId: customerId}, {merge: true});
       } catch (customerError) {
          console.error('Stripe customer creation error:', customerError);
          const errorMessage = customerError instanceof Error ? customerError.message : 'Failed to create Stripe customer.';
