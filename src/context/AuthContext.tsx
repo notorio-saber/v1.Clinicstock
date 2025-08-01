@@ -3,14 +3,14 @@
 import { useState, useEffect, createContext, ReactNode, useCallback } from 'react';
 import { onAuthStateChanged, User, getRedirectResult, signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, onSnapshot, query } from 'firebase/firestore';
+import { collection, onSnapshot, query, Unsubscribe } from 'firebase/firestore';
 import type { Subscription } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
   subscription: { id: string; isActive: boolean } | null;
-  loading: boolean; // A single loading state for the consumer
+  loading: boolean;
   reloadUser: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -25,9 +25,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
 
   const reloadUser = useCallback(async () => {
-    if (auth.currentUser) {
-      await auth.currentUser.reload();
-      setUser(auth.currentUser);
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      await currentUser.reload();
+      // This will trigger the onAuthStateChanged listener below, which will update the user state.
     }
   }, []);
 
@@ -36,7 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSubscription(null);
     router.push('/login');
-  },[router]);
+  }, [router]);
 
   useEffect(() => {
     const handleRedirect = async () => {
@@ -51,48 +52,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setAuthLoading(false);
+      if (!firebaseUser) {
+        setSubscriptionLoading(false); // If no user, no subscription to load
+      }
     });
 
     return () => unsubscribeAuth();
   }, []);
   
   useEffect(() => {
-      if (!user) {
-          setSubscription(null);
-          setSubscriptionLoading(false);
-          return;
-      }
+    let unsubscribeSub: Unsubscribe | undefined;
 
+    if (user) {
       setSubscriptionLoading(true);
       const subRef = collection(db, 'customers', user.uid, 'subscriptions');
       const q = query(subRef);
 
-      const unsubscribeSub = onSnapshot(q, (snapshot) => {
-          if (snapshot.empty) {
-              setSubscription({ id: '', isActive: false });
-          } else {
-              const subDoc = snapshot.docs[0];
-              const sub = subDoc.data() as Subscription;
-              const activeStatuses = ["trialing", "active"];
-              const isActive = activeStatuses.includes(sub.status);
-              setSubscription({ id: subDoc.id, isActive });
-          }
-          setSubscriptionLoading(false);
+      // Explicitly listen to the server to avoid cache issues on re-login
+      unsubscribeSub = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
+        if (!snapshot.metadata.fromCache) {
+            if (snapshot.empty) {
+                setSubscription({ id: '', isActive: false });
+            } else {
+                const subDoc = snapshot.docs[0];
+                const sub = subDoc.data() as Subscription;
+                const activeStatuses = ["trialing", "active"];
+                const isActive = activeStatuses.includes(sub.status);
+                setSubscription({ id: subDoc.id, isActive });
+            }
+            setSubscriptionLoading(false);
+        }
       }, (error) => {
-          console.error("Auth: Error fetching subscription.", error);
-          setSubscription({ id: '', isActive: false });
-          setSubscriptionLoading(false);
+        console.error("Auth: Error fetching subscription.", error);
+        setSubscription({ id: '', isActive: false });
+        setSubscriptionLoading(false);
       });
+    } else {
+      setSubscription(null);
+      setSubscriptionLoading(false);
+    }
 
-      return () => unsubscribeSub();
-
+    return () => {
+      if (unsubscribeSub) {
+        unsubscribeSub();
+      }
+    };
   }, [user]);
-
 
   const value = { 
     user, 
     subscription, 
-    loading: authLoading || subscriptionLoading, // Combine loading states
+    loading: authLoading || subscriptionLoading,
     reloadUser, 
     logout 
   };
