@@ -31,6 +31,14 @@ export default function ProfilePage() {
   const isPasswordProvider = user?.providerData.some(p => p.providerId === 'password');
 
   useEffect(() => {
+    // This effect ensures we get the latest subscription status when the page loads,
+    // especially after being redirected from Stripe checkout.
+    if (user) {
+        reloadUser();
+    }
+  }, []); // Run only once on component mount
+
+  useEffect(() => {
     if (user) {
       setDisplayName(user.displayName || '');
       setImagePreview(user.photoURL);
