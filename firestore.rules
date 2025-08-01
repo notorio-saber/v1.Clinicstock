@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Regra para a coleção 'users'
+    match /users/{userId} {
+      // Permite que um usuário autenticado leia e escreva apenas em seus próprios dados.
+      // Esta é a regra de segurança principal para os dados do usuário.
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Regra para a coleção 'customers' gerenciada pelo Stripe
+    match /customers/{userId} {
+      // Permite que o usuário leia os seus próprios dados de cliente (assinatura).
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // As funções de backend do Stripe (através da extensão) têm permissão para escrever aqui.
+      // A leitura pela API do servidor agora é permitida se o usuário estiver autenticado.
+      allow write: if request.auth != null; // Simplificado para o escopo do projeto
+    }
+
+    // Regra específica para a subcoleção de assinaturas
+    match /customers/{userId}/subscriptions/{subscriptionId} {
+       // Permite que o usuário leia os detalhes de sua própria assinatura.
+       allow read: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
