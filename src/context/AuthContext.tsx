@@ -3,7 +3,7 @@
 import { useState, useEffect, createContext, ReactNode, useCallback } from 'react';
 import { onAuthStateChanged, User, getRedirectResult, signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, onSnapshot, query, Unsubscribe } from 'firebase/firestore';
+import { collection, onSnapshot, query, Unsubscribe, doc, setDoc } from 'firebase/firestore';
 import type { Subscription } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
@@ -49,12 +49,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     handleRedirect();
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
-      setAuthLoading(false);
-      if (!firebaseUser) {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        // Store user info in Firestore
+        const userDocRef = doc(db, 'users', firebaseUser.uid);
+        const userData = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL,
+        };
+        await setDoc(userDocRef, userData, { merge: true });
+        
+        setUser(firebaseUser);
+      } else {
+        setUser(null);
         setSubscriptionLoading(false); // If no user, no subscription to load
       }
+      setAuthLoading(false);
     });
 
     return () => unsubscribeAuth();
@@ -68,7 +80,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const subRef = collection(db, 'customers', user.uid, 'subscriptions');
       const q = query(subRef);
 
-      // Explicitly listen to the server to avoid cache issues on re-login
       unsubscribeSub = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
         if (!snapshot.metadata.fromCache) {
             if (snapshot.empty) {

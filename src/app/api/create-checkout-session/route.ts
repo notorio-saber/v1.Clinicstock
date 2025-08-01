@@ -30,13 +30,13 @@ export async function POST(req: Request) {
     // Step 1: Check if we have a Stripe customer ID stored for this user
     const userDocRef = doc(db, 'users', userId);
     const userDocSnap = await getDoc(userDocRef);
-    let customerId: string | undefined = userDocSnap.data()?.stripeCustomerId;
+    const userData = userDocSnap.data();
+    let customerId: string | undefined = userData?.stripeCustomerId;
 
     // Step 2: If no customer ID exists, create one and store it
     if (!customerId) {
-      const user = userDocSnap.data(); // we need user's email
       const customer = await stripe.customers.create({
-        // email: user?.email, // Assuming user doc contains email
+        email: userData?.email, // Pass user's email, which is crucial
         metadata: {
           firebaseUID: userId,
         },
