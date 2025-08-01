@@ -8,13 +8,15 @@ import useAuth from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
-// Hardcoded Price IDs as a temporary solution
+// TODO: Replace with your actual Stripe Payment Links
+// You can create these in your Stripe Dashboard under Products > Payment links.
 const plans = [
     {
         name: 'Plano Mensal',
         price: 'R$ 39,90',
         period: '/mês',
-        priceId: 'price_1PgRUnRuaD3I4J794hYfG2fB', // Hardcoded ID
+        // Example link: 'https://buy.stripe.com/...'
+        paymentLink: 'COLE_SEU_LINK_MENSAL_AQUI',
         features: [
             'Gerenciamento de Produtos',
             'Controle de Estoque e Validade',
@@ -27,7 +29,8 @@ const plans = [
         name: 'Plano Anual',
         price: 'R$ 399',
         period: '/ano',
-        priceId: 'price_1PgRUnRuaD3I4J7973yO7pE7', // Hardcoded ID
+        // Example link: 'https://buy.stripe.com/...'
+        paymentLink: 'COLE_SEU_LINK_ANUAL_AQUI', 
         features: [
            'Todos os benefícios do plano mensal',
            '2 meses de desconto',
@@ -42,43 +45,23 @@ export default function SubscriptionPage() {
   const { user, subscription, loading, logout } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const [loadingPriceId, setLoadingPriceId] = useState<string | null>(null);
+  const [isRedirecting, setIsRedirecting] = useState<string | null>(null);
 
-  const handleCreateCheckout = async (priceId: string) => {
+  const handleRedirectToCheckout = (link: string) => {
     if (!user) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Você precisa estar logado para assinar.' });
         return;
     }
-    setLoadingPriceId(priceId);
-    try {
-        const response = await fetch('/api/checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ priceId: priceId, userId: user.uid }),
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(errorText || 'Failed to create checkout session');
-        }
-
-        const { url } = await response.json();
-        if (url) {
-            window.location.href = url;
-        } else {
-            toast({ variant: 'destructive', title: 'Erro', description: 'Não foi possível iniciar o checkout. Tente novamente.' });
-        }
-
-    } catch (error) {
-        console.error("Error creating checkout session:", error);
-        toast({ variant: 'destructive', title: 'Erro', description: 'Ocorreu um erro inesperado.' });
-    } finally {
-        setLoadingPriceId(null);
+    if (!link || !link.startsWith('https://buy.stripe.com/')) {
+        toast({ variant: 'destructive', title: 'Erro de Configuração', description: 'O link de pagamento não está configurado corretamente.' });
+        return;
     }
+    setIsRedirecting(link);
+    window.location.href = link;
   };
 
   const handleManageSubscription = async () => {
-    setLoadingPriceId('manage');
+    setIsRedirecting('manage');
     try {
         const response = await fetch('/api/manage-subscription', {
             method: 'POST',
@@ -95,7 +78,7 @@ export default function SubscriptionPage() {
          console.error("Error creating portal link:", error);
         toast({ variant: 'destructive', title: 'Erro', description: 'Ocorreu um erro inesperado.' });
     } finally {
-        setLoadingPriceId(null);
+        setIsRedirecting(null);
     }
   };
 
@@ -161,10 +144,10 @@ export default function SubscriptionPage() {
                     <CardFooter>
                          <Button 
                             className="w-full" 
-                            onClick={() => handleCreateCheckout(plan.priceId)}
-                            disabled={!plan.priceId || !!loadingPriceId || !user}
+                            onClick={() => handleRedirectToCheckout(plan.paymentLink)}
+                            disabled={!!isRedirecting || !user}
                         >
-                            {loadingPriceId === plan.priceId && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {isRedirecting === plan.paymentLink && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             {plan.isFeatured ? 'Assinar com Desconto' : 'Assinar Agora'}
                         </Button>
                     </CardFooter>
