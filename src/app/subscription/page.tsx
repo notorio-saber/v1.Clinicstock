@@ -8,15 +8,12 @@ import useAuth from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 
-// TODO: Replace with your actual Stripe Payment Links
-// You can create these in your Stripe Dashboard under Products > Payment links.
 const plans = [
     {
         name: 'Plano Mensal',
         price: 'R$ 39,90',
         period: '/mês',
-        // Example link: 'https://buy.stripe.com/...'
-        paymentLink: 'COLE_SEU_LINK_MENSAL_AQUI',
+        paymentLink: 'https://buy.stripe.com/test_28E5kEgGq6mf1qu24Jgw000',
         features: [
             'Gerenciamento de Produtos',
             'Controle de Estoque e Validade',
@@ -29,8 +26,7 @@ const plans = [
         name: 'Plano Anual',
         price: 'R$ 399',
         period: '/ano',
-        // Example link: 'https://buy.stripe.com/...'
-        paymentLink: 'COLE_SEU_LINK_ANUAL_AQUI', 
+        paymentLink: 'https://buy.stripe.com/test_3cI6oIfCm6mf4CG6kZgw001', 
         features: [
            'Todos os benefícios do plano mensal',
            '2 meses de desconto',
