@@ -14,20 +14,20 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
 // This function handles POST requests to create a Stripe Checkout session
 export async function POST(req: Request) {
   try {
-    const {userId, userEmail, priceId} = await req.json();
+    const {userId, priceId} = await req.json();
 
     // 1. Validate input parameters
-    if (!userId || !priceId || !userEmail) {
+    if (!userId || !priceId) {
       return NextResponse.json(
-        {message: 'Missing required parameters: userId, userEmail, and priceId.'},
+        {message: 'Missing required parameters: userId and priceId.'},
         {status: 400}
       );
     }
     
-    // Ensure adminDb is initialized
+    // Ensure adminDb is initialized (it won't be in local dev unless you set up the env var)
     if (!adminDb) {
       return NextResponse.json(
-        { message: 'Firebase Admin SDK not initialized.' },
+        { message: 'Firebase Admin SDK not initialized on the server.' },
         { status: 500 }
       );
     }
@@ -37,12 +37,13 @@ export async function POST(req: Request) {
 
     const userDocRef = adminDb.collection('users').doc(userId);
     const userDocSnap = await userDocRef.get();
-
-    let customerId: string | undefined;
-
-    if (userDocSnap.exists) {
-        customerId = userDocSnap.data()?.stripeCustomerId;
+    
+    if (!userDocSnap.exists) {
+        return NextResponse.json({ message: 'User not found in Firestore.' }, { status: 404 });
     }
+
+    const userEmail = userDocSnap.data()?.email;
+    let customerId = userDocSnap.data()?.stripeCustomerId;
 
     // 2. Find or create a Stripe Customer
     if (!customerId) {

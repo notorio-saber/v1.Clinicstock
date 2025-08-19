@@ -1,3 +1,4 @@
+
 'use client';
 
 import { Button } from '@/components/ui/button';
@@ -45,7 +46,7 @@ export default function SubscriptionPage() {
   const [isRedirecting, setIsRedirecting] = useState<string | null>(null);
 
   const handleRedirectToCheckout = async (priceId: string) => {
-    if (!user || !user.email) {
+    if (!user) {
         toast({ variant: 'destructive', title: 'Erro', description: 'Você precisa estar logado para assinar.' });
         return;
     }
@@ -60,7 +61,7 @@ export default function SubscriptionPage() {
         const response = await fetch('/api/create-checkout-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.uid, userEmail: user.email, priceId }),
+            body: JSON.stringify({ userId: user.uid, priceId }),
         });
 
         if (!response.ok) {
@@ -162,3 +163,4 @@ export default function SubscriptionPage() {
     </>
   );
 }
+

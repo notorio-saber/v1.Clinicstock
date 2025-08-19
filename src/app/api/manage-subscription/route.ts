@@ -43,7 +43,7 @@ export async function POST(req: Request) {
     // Step 2: If no customer ID exists, we can't create a portal session.
     if (!customerId) {
         return new NextResponse(
-            'Stripe customer ID not found for this user.',
+            'Stripe customer ID not found for this user. This should be created during first checkout.',
             { status: 404 }
         );
     }

@@ -44,8 +44,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const handleRedirect = async () => {
       try {
         const result = await getRedirectResult(auth);
-        // This will be null if no redirect operation was in progress.
-        // If it was, the onAuthStateChanged listener will handle the user object.
+        if (result) {
+            // This case handles the redirect from Google Sign In.
+            const firebaseUser = result.user;
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            const userDocSnap = await getDoc(userDocRef);
+            
+            if (!userDocSnap.exists()) {
+                const userData = {
+                  uid: firebaseUser.uid,
+                  email: firebaseUser.email,
+                  displayName: firebaseUser.displayName,
+                  photoURL: firebaseUser.photoURL,
+                };
+                await setDoc(userDocRef, userData, { merge: true });
+            }
+        }
       } catch (error) {
         console.error("Auth: Error getting redirect result", error);
       }
@@ -54,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // When a user signs in (or is already signed in), create their document in Firestore.
+         // This handles direct email sign-in and subsequent app loads
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         
@@ -64,9 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               email: firebaseUser.email,
               displayName: firebaseUser.displayName,
               photoURL: firebaseUser.photoURL,
-              // Any other initial data for the user
             };
-            // Use setDoc with merge:true to be safe, though it's a new doc.
             await setDoc(userDocRef, userData, { merge: true });
         }
         
@@ -86,7 +98,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (user) {
       setSubscriptionLoading(true);
-      // The Stripe extension creates the 'customers' collection
+      // NOTE: This collection is created and managed by the "Stripe" Firebase extension.
+      // It is different from our `users` collection.
       const subRef = collection(db, 'customers', user.uid, 'subscriptions');
       const q = query(subRef);
 
