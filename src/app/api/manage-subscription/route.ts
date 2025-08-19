@@ -20,6 +20,10 @@ export async function POST(req: Request) {
       return new NextResponse('Missing userId', {status: 400});
     }
 
+    if (!adminDb) {
+      return new NextResponse('Firebase Admin not initialized', { status: 500 });
+    }
+
     const headersList = headers();
     const origin = headersList.get('origin') || 'http://localhost:3000';
 
@@ -31,7 +35,7 @@ export async function POST(req: Request) {
     const userDocSnap = await userDocRef.get();
 
     if (!userDocSnap.exists) {
-        return new NextResponse('User not found.', { status: 404 });
+        return new NextResponse('User not found in Firestore.', { status: 404 });
     }
 
     let customerId: string | undefined = userDocSnap.data()?.stripeCustomerId;
@@ -39,7 +43,7 @@ export async function POST(req: Request) {
     // Step 2: If no customer ID exists, we can't create a portal session.
     if (!customerId) {
         return new NextResponse(
-            'Stripe customer ID not found for this user. Please complete a subscription first.',
+            'Stripe customer ID not found for this user.',
             { status: 404 }
         );
     }

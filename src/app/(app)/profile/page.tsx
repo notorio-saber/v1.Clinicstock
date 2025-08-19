@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect, useRef, ChangeEvent } from 'react';
@@ -13,12 +14,13 @@ import { auth, storage } from '@/lib/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function ProfilePage() {
   const { user, subscription, loading: authLoading, reloadUser, logout } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [displayName, setDisplayName] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -30,12 +32,13 @@ export default function ProfilePage() {
   const isPasswordProvider = user?.providerData.some(p => p.providerId === 'password');
 
   useEffect(() => {
-    // This effect ensures we get the latest subscription status when the page loads,
-    // especially after being redirected from Stripe checkout.
-    if (user) {
+    // This effect ensures we get the latest user/subscription status when the page loads,
+    // especially after being redirected from Stripe checkout which includes a session_id.
+    const sessionId = searchParams.get('session_id');
+    if (user && sessionId) {
         reloadUser();
     }
-  }, [reloadUser, user]);
+  }, [reloadUser, user, searchParams]);
 
   useEffect(() => {
     if (user) {

@@ -23,6 +23,14 @@ export async function POST(req: Request) {
         {status: 400}
       );
     }
+    
+    // Ensure adminDb is initialized
+    if (!adminDb) {
+      return NextResponse.json(
+        { message: 'Firebase Admin SDK not initialized.' },
+        { status: 500 }
+      );
+    }
 
     const headersList = headers();
     const origin = headersList.get('origin') || 'http://localhost:3000';

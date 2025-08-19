@@ -1,9 +1,10 @@
+
 'use client';
 
 import { useState, useEffect, createContext, ReactNode, useCallback } from 'react';
 import { onAuthStateChanged, User, getRedirectResult, signOut } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { collection, onSnapshot, query, Unsubscribe, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, query, Unsubscribe, doc, setDoc, getDoc } from 'firebase/firestore';
 import type { Subscription } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 
@@ -42,7 +43,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handleRedirect = async () => {
       try {
-        await getRedirectResult(auth);
+        const result = await getRedirectResult(auth);
+        // This will be null if no redirect operation was in progress.
+        // If it was, the onAuthStateChanged listener will handle the user object.
       } catch (error) {
         console.error("Auth: Error getting redirect result", error);
       }
@@ -51,15 +54,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        // Store user info in Firestore
+        // When a user signs in (or is already signed in), create their document in Firestore.
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        const userData = {
-          uid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          photoURL: firebaseUser.photoURL,
-        };
-        await setDoc(userDocRef, userData, { merge: true });
+        const userDocSnap = await getDoc(userDocRef);
+        
+        if (!userDocSnap.exists()) {
+            const userData = {
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              displayName: firebaseUser.displayName,
+              photoURL: firebaseUser.photoURL,
+              // Any other initial data for the user
+            };
+            // Use setDoc with merge:true to be safe, though it's a new doc.
+            await setDoc(userDocRef, userData, { merge: true });
+        }
         
         setUser(firebaseUser);
       } else {
@@ -77,22 +86,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (user) {
       setSubscriptionLoading(true);
+      // The Stripe extension creates the 'customers' collection
       const subRef = collection(db, 'customers', user.uid, 'subscriptions');
       const q = query(subRef);
 
-      unsubscribeSub = onSnapshot(q, { includeMetadataChanges: true }, (snapshot) => {
-        if (!snapshot.metadata.fromCache) {
-            if (snapshot.empty) {
-                setSubscription({ id: '', isActive: false });
-            } else {
-                const subDoc = snapshot.docs[0];
-                const sub = subDoc.data() as Subscription;
-                const activeStatuses = ["trialing", "active"];
-                const isActive = activeStatuses.includes(sub.status);
-                setSubscription({ id: subDoc.id, isActive });
-            }
-            setSubscriptionLoading(false);
-        }
+      unsubscribeSub = onSnapshot(q, (snapshot) => {
+          if (snapshot.empty) {
+              setSubscription({ id: '', isActive: false });
+          } else {
+              const subDoc = snapshot.docs[0];
+              const sub = subDoc.data() as Subscription;
+              const activeStatuses = ["trialing", "active"];
+              const isActive = activeStatuses.includes(sub.status);
+              setSubscription({ id: subDoc.id, isActive });
+          }
+          setSubscriptionLoading(false);
       }, (error) => {
         console.error("Auth: Error fetching subscription.", error);
         setSubscription({ id: '', isActive: false });
