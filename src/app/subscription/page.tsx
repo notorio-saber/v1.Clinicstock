@@ -15,7 +15,7 @@ const plans = [
         price: 'R$ 39,90',
         period: '/mês',
         // O ID do preço é necessário para a sessão de checkout
-        priceId: 'price_1PgWiyRVEaHkOD4JituKk9aO', // Substitua pelo seu Price ID real
+        priceId: 'price_1PeP5gRxp7y2FAPqDUM4N31e',
         features: [
             'Gerenciamento de Produtos',
             'Controle de Estoque e Validade',
@@ -28,7 +28,7 @@ const plans = [
         name: 'Plano Anual',
         price: 'R$ 399',
         period: '/ano',
-        priceId: 'price_1PgWjMRVEaHkOD4Jp0pT6R5I', // Substitua pelo seu Price ID real
+        priceId: 'price_1PeP6HRxp7y2FAPq407e3I0u',
         features: [
            'Todos os benefícios do plano mensal',
            '2 meses de desconto',
@@ -163,5 +163,3 @@ export default function SubscriptionPage() {
     </>
   );
 }
-
-
